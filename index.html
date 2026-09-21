@@ -71,7 +71,7 @@
   .clist { list-style: none; margin: 0; padding: 0; max-height: 62vh; overflow-y: auto; }
   .clist li { padding: 11px 12px; border-radius: 9px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; gap: 11px; border: 1px solid transparent; transition: background .12s; }
   .clist li:hover { background: var(--bg); }
-  .clist li.active { background: var(--accent-soft); border-color: var(--accent); }
+  .clist li.active { background: var(--accent-soft); border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: -2px; }
   .avatar { width: 34px; height: 34px; border-radius: 8px; flex: none; display: grid; place-items: center; font-weight: 650; font-size: 13px; color: #fff; }
   .cl-name { font-weight: 600; font-size: 14px; }
   .cl-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -113,6 +113,8 @@
   .sub-add input:focus, .sub-add textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   .sub-add .narrow { flex: 0 0 130px; min-width: 0; }
   .sub-add .date { flex: 0 0 150px; min-width: 0; }
+  .sub-add .time { flex: 0 0 105px; min-width: 0; }
+  .agenda-when .h { font-size: 11px; font-weight: 700; color: var(--accent); margin-top: 2px; }
 
   .line-list { list-style: none; margin: 0; padding: 0; }
   .line-list li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--bg); }
@@ -172,6 +174,14 @@
   .placeholder h3 { margin: 0 0 6px; color: var(--text); font-weight: 600; }
 
   .hidden { display: none !important; }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+  .swatch.sel { border-color: var(--text); }
+  .team-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .team-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+  .team-chip.on { border-color: var(--text); }
+  .team-chip .cdot { width: 10px; height: 10px; border-radius: 50%; }
+  .suivi-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; margin-top: 4px; }
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
 
@@ -238,6 +248,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             <input type="text" id="searchInput" placeholder="Rechercher un client…">
           </div>
+          <div class="team-bar" id="teamBar"></div>
           <ul class="clist" id="clientList"></ul>
         </div>
       </div>
@@ -263,6 +274,16 @@
           <option value="particulier">Particulier</option>
           <option value="pro">Professionnel (entreprise)</option>
         </select>
+      </div>
+      <div class="field"><label>Interlocuteur à la scierie (suivi par)</label>
+        <select id="f_suivi"></select>
+        <div id="newPersonBox" class="hidden" style="margin-top:8px">
+          <input id="f_newPerson" type="text" placeholder="Prénom (ex : Théo)" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)">
+        </div>
+        <div id="swatchBox" class="hidden">
+          <div style="font-size:12px;color:var(--muted);margin-top:8px">Couleur de cette personne dans la liste :</div>
+          <div class="swatches" id="swatches"></div>
+        </div>
       </div>
 
       <div id="partFields">
@@ -353,20 +374,52 @@
 
   function emptyClient(){
     return { type:"particulier", prenom:"", nom:"", tel:"", mail:"", societe:"",
-             interlocuteurs:[], adresse:"", infos:"",
+             interlocuteurs:[], adresse:"", infos:"", suivi:"",
              factures:[], echanges:[], actions:[], createdAt:new Date().toISOString() };
+  }
+
+  // ---------- Équipe de la scierie (interlocuteurs internes + couleurs) ----------
+  var PALETTE = {
+    bleu:{bg:"#e6efff",fg:"#2b5ce6"}, vert:{bg:"#e3f6ea",fg:"#1f9d63"}, orange:{bg:"#fff0de",fg:"#c26f00"},
+    violet:{bg:"#f1e8ff",fg:"#7d45cf"}, rose:{bg:"#ffe6ef",fg:"#c83c70"}, jaune:{bg:"#fff8d4",fg:"#a88400"},
+    turquoise:{bg:"#dcf5f2",fg:"#0d8a7e"}, gris:{bg:"#eef1f5",fg:"#5b6577"}
+  };
+  var equipe = [];          // [{id, nom, couleur}]
+  var filterSuivi = "";     // filtre de la liste ("" = tous)
+  var pickedColor = "bleu";
+  function membre(nom){ nom=(nom||"").trim().toLowerCase(); if(!nom) return null; for(var i=0;i<equipe.length;i++) if(equipe[i].nom.trim().toLowerCase()===nom) return equipe[i]; return null; }
+  function couleurDe(nom){ var m=membre(nom); return m ? (PALETTE[m.couleur]||PALETTE.bleu) : null; }
+  async function loadEquipe(){
+    try{
+      var res = await sb.from("equipe").select("*").order("created_at",{ascending:true});
+      if(res.error) throw res.error;
+      equipe = res.data||[];
+    }catch(e){ console.error(e); toast("Équipe non chargée (script SQL exécuté ?)"); }
+  }
+  async function saveMembre(nom, couleur){
+    var m=membre(nom);
+    if(m){
+      if(m.couleur===couleur) return;
+      var r1 = await sb.from("equipe").update({couleur:couleur}).eq("id", m.id);
+      if(r1.error) throw r1.error;
+      m.couleur=couleur;
+    } else {
+      var r2 = await sb.from("equipe").insert({ nom:nom, couleur:couleur, user_id:currentUser.id }).select();
+      if(r2.error) throw r2.error;
+      equipe.push(r2.data[0]);
+    }
   }
 
   // ---------- Supabase mapping ----------
   function mapToRow(d){
     return { type:d.type||"particulier", prenom:d.prenom||"", nom:d.nom||"", tel:d.tel||"", mail:d.mail||"",
       societe:d.societe||"", interlocuteurs:d.interlocuteurs||[], adresse:d.adresse||"", infos:d.infos||"",
-      factures:d.factures||[], echanges:d.echanges||[], actions:d.actions||[], created_at:d.createdAt||new Date().toISOString() };
+      factures:d.factures||[], echanges:d.echanges||[], actions:d.actions||[], suivi_par:d.suivi||"", created_at:d.createdAt||new Date().toISOString() };
   }
   function mapFromRow(r){
     return { type:r.type||"particulier", prenom:r.prenom||"", nom:r.nom||"", tel:r.tel||"", mail:r.mail||"",
       societe:r.societe||"", interlocuteurs:r.interlocuteurs||[], adresse:r.adresse||"", infos:r.infos||"",
-      factures:r.factures||[], echanges:r.echanges||[], actions:r.actions||[], createdAt:r.created_at||new Date().toISOString() };
+      factures:r.factures||[], echanges:r.echanges||[], actions:r.actions||[], suivi:r.suivi_par||"", createdAt:r.created_at||new Date().toISOString() };
   }
 
   async function persist(client){
@@ -412,7 +465,7 @@
     });
   }
   function showAuth(){ $("authScreen").classList.remove("hidden"); $("appScreen").classList.add("hidden"); }
-  async function showApp(){ $("authScreen").classList.add("hidden"); $("appScreen").classList.remove("hidden"); $("userEmail").textContent = currentUser.email||""; await loadClients(); }
+  async function showApp(){ $("authScreen").classList.add("hidden"); $("appScreen").classList.remove("hidden"); $("userEmail").textContent = currentUser.email||""; await loadEquipe(); await loadClients(); }
 
   // ---------- Data helpers ----------
   function getClient(id){ for(var i=0;i<clients.length;i++) if(clients[i].id===id) return clients[i]; return null; }
@@ -421,23 +474,45 @@
     var arr = clients.slice().sort(function(a,b){ return displayName(a.data).localeCompare(displayName(b.data),"fr"); });
     if(!q) return arr;
     return arr.filter(function(c){
-      var d=c.data, hay = displayName(d)+" "+(d.mail||"")+" "+(d.tel||"")+" "+(d.societe||"");
+      var d=c.data, hay = displayName(d)+" "+(d.suivi||"")+" "+(d.mail||"")+" "+(d.tel||"")+" "+(d.societe||"");
       (d.interlocuteurs||[]).forEach(function(it){ hay += " "+(it.nom||"")+" "+(it.mail||""); });
       return hay.toLowerCase().indexOf(q)>=0;
     });
   }
-  function nextActionFor(c){ var open = (c.actions||[]).filter(function(a){ return !a.done && a.date; }); open.sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); }); return open[0] || null; }
+  function actKey(a){ return (a.date||"9999-99-99")+" "+(a.time||"99:99"); }
+  function fmtWhen(date,time){ return fmtDate(date)+(time?" à "+time.replace(":","h"):""); }
+  function nextActionFor(c){ var open = (c.actions||[]).filter(function(a){ return !a.done && a.date; }); open.sort(function(a,b){ return actKey(a).localeCompare(actKey(b)); }); return open[0] || null; }
 
   // ---------- List ----------
+  function renderTeamBar(){
+    var bar=$("teamBar");
+    var used = equipe.filter(function(m){ return clients.some(function(c){ return membre(c.data.suivi)===m; }); });
+    if(!used.length){ bar.innerHTML=""; filterSuivi=""; return; }
+    var html = '<span class="team-chip'+(filterSuivi===""?" on":"")+'" data-f="">Tous</span>';
+    used.forEach(function(m){
+      var col=PALETTE[m.couleur]||PALETTE.bleu;
+      var n=clients.filter(function(c){ return membre(c.data.suivi)===m; }).length;
+      html += '<span class="team-chip'+(filterSuivi===m.nom?" on":"")+'" data-f="'+esc(m.nom)+'" style="background:'+col.bg+'"><span class="cdot" style="background:'+col.fg+'"></span>'+esc(m.nom)+' ('+n+')</span>';
+    });
+    bar.innerHTML = html;
+    Array.prototype.forEach.call(bar.querySelectorAll("[data-f]"), function(el){
+      el.addEventListener("click", function(){ filterSuivi = el.getAttribute("data-f"); renderList(); });
+    });
+  }
   function renderList(){
+    renderTeamBar();
     var ul = $("clientList"), arr = filteredClients();
+    if(filterSuivi){ arr = arr.filter(function(c){ var m=membre(c.data.suivi); return m && m.nom===filterSuivi; }); }
     if(!arr.length){ ul.innerHTML = '<div class="empty">Aucun client.<br>Cliquez sur « + Nouveau ».</div>'; return; }
     ul.innerHTML = arr.map(function(c){
       var d=c.data, na=nextActionFor(d), meta="";
       if(na){ var u=urgencyClass(na.date); if(u) meta = '<span class="pill '+(u==="due"?"due":"soon")+'">'+(u==="due"?"À faire":"Bientôt")+'</span>'; }
       var n=(d.interlocuteurs||[]).length;
       var sub = isPro(d) ? (n>0 ? (n+" interlocuteur"+(n>1?"s":"")) : "Aucun interlocuteur") : (d.mail || d.tel || "—");
-      return '<li data-id="'+c.id+'" class="'+(c.id===selectedId?"active":"")+'">'+
+      var col = couleurDe(d.suivi);
+      var liStyle = col ? ' style="background:'+col.bg+';border-left:4px solid '+col.fg+'"' : '';
+      if(d.suivi) sub += " · 👤 "+d.suivi;
+      return '<li data-id="'+c.id+'" class="'+(c.id===selectedId?"active":"")+'"'+liStyle+'>'+
         '<div class="avatar" style="background:'+colorFor(c.id)+'">'+esc(initials(d))+'</div>'+
         '<div style="min-width:0">'+
           '<div class="cl-name">'+esc(displayName(d))+'</div>'+
@@ -466,9 +541,9 @@
         amt + '<button class="x" data-del-fac="'+f.id+'">✕</button></li>';
     }).join("") || '<div class="empty" style="padding:12px">Aucune facture.</div>';
 
-    var actions = (d.actions||[]).slice().sort(function(a,b){ if(a.done!==b.done) return a.done?1:-1; return (a.date||"9999").localeCompare(b.date||"9999"); });
+    var actions = (d.actions||[]).slice().sort(function(a,b){ if(a.done!==b.done) return a.done?1:-1; return actKey(a).localeCompare(actKey(b)); });
     var actionsHTML = actions.map(function(a){
-      var badge = a.date ? '<span class="date-badge '+urgencyClass(a.date)+'">'+esc(fmtDate(a.date))+'</span>' : '';
+      var badge = a.date ? '<span class="date-badge '+urgencyClass(a.date)+'">'+esc(fmtWhen(a.date,a.time))+'</span>' : '';
       return '<li class="'+(a.done?"task-done":"")+'" data-aid="'+a.id+'">'+
         '<input type="checkbox" class="chk" data-toggle="'+a.id+'" '+(a.done?"checked":"")+'>'+
         '<div class="li-main"><div class="li-t">'+esc(a.label)+'</div></div>'+ badge +
@@ -502,6 +577,7 @@
         '<div class="detail-title">'+
           '<h2>'+esc(displayName(d))+' <span class="tag '+(isPro(d)?"pro":"particulier")+'" style="vertical-align:middle;font-size:12px">'+(isPro(d)?"Pro":"Particulier")+'</span></h2>'+
           '<p>'+esc(isPro(d)?"Entreprise":"Particulier")+'</p>'+
+          (d.suivi ? (function(){ var col=couleurDe(d.suivi)||PALETTE.gris; return '<span class="suivi-badge" style="background:'+col.bg+';color:'+col.fg+'">👤 Suivi par '+esc(d.suivi)+'</span>'; })() : '')+
         '</div>'+
         '<div class="head-actions">'+
           '<button class="btn ghost sm" id="btnBack">← Actions à venir</button>'+
@@ -524,6 +600,7 @@
       '<div class="sub-add">'+
         '<input type="text" id="act_label" placeholder="Action à faire (ex : rappeler pour devis)">'+
         '<input type="date" id="act_date" class="date">'+
+        '<input type="time" id="act_time" class="time" title="Heure (facultatif)">'+
         '<button class="btn sm" id="act_add">Ajouter</button>'+
       '</div>'+
       '<ul class="line-list" id="actList">'+actionsHTML+'</ul>'+
@@ -565,9 +642,9 @@
   function renderAgenda(){
     var items = [];
     clients.forEach(function(c){
-      (c.data.actions||[]).forEach(function(a){ if(!a.done && a.date) items.push({ clientId:c.id, clientName:displayName(c.data), label:a.label, date:a.date }); });
+      (c.data.actions||[]).forEach(function(a){ if(!a.done && a.date) items.push({ clientId:c.id, clientName:displayName(c.data), label:a.label, date:a.date, time:a.time||"" }); });
     });
-    items.sort(function(a,b){ return a.date.localeCompare(b.date); });
+    items.sort(function(a,b){ return actKey(a).localeCompare(actKey(b)); });
     var list;
     if(!items.length){
       list = '<div class="placeholder"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><h3>Aucune action à venir</h3><p>Sélectionnez un client pour ajouter des actions,<br>ou créez un nouveau client.</p></div>';
@@ -575,8 +652,8 @@
       list = items.map(function(it){
         var u = urgencyClass(it.date);
         return '<div class="agenda-item" data-goto="'+it.clientId+'">'+
-          '<div class="agenda-when"><div class="d" style="'+(u==="due"?"color:var(--danger)":u==="soon"?"color:var(--warn)":"")+'">'+dayNum(it.date)+'</div><div class="m">'+esc(monthShort(it.date))+'</div></div>'+
-          '<div class="agenda-main"><div class="at">'+esc(it.label)+'</div><div class="ac">'+esc(it.clientName)+' · '+esc(fmtDate(it.date))+'</div></div>'+
+          '<div class="agenda-when"><div class="d" style="'+(u==="due"?"color:var(--danger)":u==="soon"?"color:var(--warn)":"")+'">'+dayNum(it.date)+'</div><div class="m">'+esc(monthShort(it.date))+'</div>'+(it.time?'<div class="h">'+esc(it.time.replace(":","h"))+'</div>':'')+'</div>'+
+          '<div class="agenda-main"><div class="at">'+esc(it.label)+'</div><div class="ac">'+esc(it.clientName)+' · '+esc(fmtWhen(it.date,it.time))+'</div></div>'+
           (u?'<span class="date-badge '+u+'">'+(u==="due"?"À faire":"Bientôt")+'</span>':'')+'</div>';
       }).join("");
     }
@@ -596,9 +673,9 @@
     $("btnDelete").addEventListener("click", function(){ if(confirm("Supprimer définitivement "+displayName(d)+" ?")){ remove(c.id); selectedId=null; } });
 
     $("act_add").addEventListener("click", function(){
-      var label=($("act_label").value||"").trim(), date=$("act_date").value;
+      var label=($("act_label").value||"").trim(), date=$("act_date").value, time=$("act_time").value||"";
       if(!label){ toast("Saisissez une action"); return; }
-      d.actions = d.actions||[]; d.actions.push({ id:shortId(), label:label, date:date||"", done:false });
+      d.actions = d.actions||[]; d.actions.push({ id:shortId(), label:label, date:date||"", time:(date?time:""), done:false });
       persist(c).then(render); toast("Action ajoutée");
     });
     $("act_label").addEventListener("keydown", function(e){ if(e.key==="Enter") $("act_add").click(); });
@@ -679,6 +756,32 @@
     });
   }
 
+  function renderSwatches(){
+    $("swatches").innerHTML = Object.keys(PALETTE).map(function(k){
+      return '<span class="swatch'+(k===pickedColor?" sel":"")+'" data-c="'+k+'" title="'+k+'" style="background:'+PALETTE[k].bg+';box-shadow:inset 0 0 0 6px '+PALETTE[k].bg+', inset 0 0 0 14px '+PALETTE[k].fg+'"></span>';
+    }).join("");
+    Array.prototype.forEach.call($("swatches").querySelectorAll("[data-c]"), function(el){
+      el.addEventListener("click", function(){ pickedColor = el.getAttribute("data-c"); renderSwatches(); });
+    });
+  }
+  function fillSuiviSelect(current){
+    var opts = '<option value="">— Personne —</option>';
+    equipe.forEach(function(m){ opts += '<option value="'+esc(m.nom)+'">'+esc(m.nom)+'</option>'; });
+    if(current && !membre(current)) opts += '<option value="'+esc(current)+'">'+esc(current)+'</option>';
+    opts += '<option value="__new__">+ Ajouter une personne…</option>';
+    $("f_suivi").innerHTML = opts;
+    $("f_suivi").value = current || "";
+    onSuiviChange();
+  }
+  function onSuiviChange(){
+    var v = $("f_suivi").value;
+    $("newPersonBox").classList.toggle("hidden", v!=="__new__");
+    $("swatchBox").classList.toggle("hidden", v==="");
+    if(v==="__new__"){ $("f_newPerson").value=""; pickedColor = Object.keys(PALETTE)[equipe.length % Object.keys(PALETTE).length]; }
+    else if(v){ var m=membre(v); pickedColor = m ? m.couleur : "bleu"; }
+    renderSwatches();
+  }
+
   function openModal(id){
     editingId = id || null;
     $("modalTitle").textContent = id ? "Modifier le client" : "Nouveau client";
@@ -687,7 +790,7 @@
     $("f_prenom").value=d.prenom||""; $("f_nom").value=d.nom||""; $("f_tel").value=d.tel||""; $("f_mail").value=d.mail||"";
     $("f_societe").value=d.societe||""; $("f_adresse").value=d.adresse||""; $("f_infos").value=d.infos||"";
     editInterlocs = (d.interlocuteurs||[]).map(function(x){ return Object.assign({}, x); });
-    renderInterlocs(); toggleTypeFields();
+    renderInterlocs(); toggleTypeFields(); fillSuiviSelect(d.suivi||"");
     $("modalBg").classList.add("open");
     setTimeout(function(){ ($("f_type").value==="pro"?$("f_societe"):$("f_prenom")).focus(); },50);
   }
@@ -706,6 +809,10 @@
     d.societe=$("f_societe").value.trim();
     d.interlocuteurs = type==="pro" ? editInterlocs.filter(function(it){ return (it.nom||it.mail||it.tel||it.poste); }).map(function(it){ return { id:it.id||shortId(), nom:it.nom||"", poste:it.poste||"", tel:it.tel||"", mail:it.mail||"" }; }) : (d.interlocuteurs||[]);
     d.adresse=$("f_adresse").value.trim(); d.infos=$("f_infos").value.trim();
+    var sv = $("f_suivi").value;
+    if(sv==="__new__"){ sv = ($("f_newPerson").value||"").trim(); if(!sv){ toast("Saisissez le prénom de la personne"); return; } }
+    if(sv){ try{ await saveMembre(sv, pickedColor); }catch(e){ console.error(e); toast("Couleur non enregistrée (script SQL exécuté ?)"); } }
+    d.suivi = sv;
     await persist(target);
     selectedId = target.id;
     toast(isNew ? "Client créé" : "Client mis à jour");
@@ -759,6 +866,7 @@
   $("modalSave").addEventListener("click", saveModal);
   $("modalBg").addEventListener("click", function(e){ if(e.target===$("modalBg")) closeModal(); });
   $("f_type").addEventListener("change", toggleTypeFields);
+  $("f_suivi").addEventListener("change", onSuiviChange);
   $("addInterloc").addEventListener("click", function(){ editInterlocs.push({ id:shortId(), nom:"", poste:"", tel:"", mail:"" }); renderInterlocs(); });
   $("searchInput").addEventListener("input", renderList);
   document.addEventListener("keydown", function(e){ if(e.key==="Escape" && $("modalBg").classList.contains("open")) closeModal(); });
