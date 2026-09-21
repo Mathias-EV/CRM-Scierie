@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CRM — Gestion Clients</title>
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #fbfcfe;
+    --panel: #ffffff;
+    --border: #e8edf4;
+    --text: #26303f;
+    --muted: #7a8598;
+    --accent: #2b5ce6;
+    --accent-soft: #eaf0fe;
+    --accent-hover: #1e47c4;
+    --danger: #d64545;
+    --danger-soft: #fceaea;
+    --ok: #1f9d63;
+    --warn: #e08600;
+    --warn-soft: #fdf1df;
+    --shadow: 0 1px 3px rgba(20,30,50,.06), 0 6px 20px rgba(20,30,50,.05);
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root[data-theme="dark"] {
+      --bg: #0f1319; --panel: #171d27; --border: #262f3d; --text: #e6ebf2;
+      --muted: #8a94a6; --accent: #4f7bff; --accent-soft: #1b2536; --accent-hover: #6b90ff;
+      --danger: #e06666; --danger-soft: #2c1c1e; --ok: #35c281; --warn: #e3a53f; --warn-soft: #2c2416;
+      --shadow: 0 1px 3px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1319; --panel: #171d27; --border: #262f3d; --text: #e6ebf2;
+    --muted: #8a94a6; --accent: #4f7bff; --accent-soft: #1b2536; --accent-hover: #6b90ff;
+    --danger: #e06666; --danger-soft: #2c1c1e; --ok: #35c281; --warn: #e3a53f; --warn-soft: #2c2416;
+    --shadow: 0 1px 3px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 1180px; margin: 0 auto; padding: 22px clamp(14px, 3vw, 30px) 60px; }
+
+  header.top {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    margin-bottom: 22px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .logo {
+    width: 38px; height: 38px; border-radius: 10px; flex: none;
+    background: linear-gradient(135deg, var(--accent), #7aa0ff);
+    display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 18px;
+  }
+  .brand h1 { font-size: 19px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  .brand p { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.on { background: var(--ok); }
+  .dot.off { background: var(--warn); }
+
+  .grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .panel-h { padding: 15px 17px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .panel-h h2 { font-size: 14px; margin: 0; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .panel-b { padding: 15px 17px; }
+
+  input, textarea, select, button { font-family: inherit; font-size: 14px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text); transition: border-color .15s, box-shadow .15s;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .field textarea { resize: vertical; min-height: 64px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 520px) { .row2 { grid-template-columns: 1fr; } }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 9px 15px; border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+    font-weight: 600; background: var(--accent); color: #fff; transition: background .15s, transform .05s;
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.ghost { background: transparent; color: var(--accent); border-color: var(--border); }
+  .btn.ghost:hover { background: var(--accent-soft); }
+  .btn.danger { background: transparent; color: var(--danger); border-color: var(--border); }
+  .btn.danger:hover { background: var(--danger-soft); }
+  .btn.sm { padding: 6px 11px; font-size: 13px; }
+  .btn.block { width: 100%; }
+
+  .search { position: relative; margin-bottom: 12px; }
+  .search input { width: 100%; padding: 9px 11px 9px 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+  .search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+
+  .clist { list-style: none; margin: 0; padding: 0; max-height: 62vh; overflow-y: auto; }
+  .clist li {
+    padding: 11px 12px; border-radius: 9px; cursor: pointer; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 11px; border: 1px solid transparent; transition: background .12s;
+  }
+  .clist li:hover { background: var(--bg); }
+  .clist li.active { background: var(--accent-soft); border-color: var(--accent); }
+  .avatar { width: 34px; height: 34px; border-radius: 8px; flex: none; display: grid; place-items: center; font-weight: 650; font-size: 13px; color: #fff; }
+  .cl-name { font-weight: 600; font-size: 14px; }
+  .cl-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cl-meta { margin-left: auto; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+  .pill.due { background: var(--danger-soft); color: var(--danger); }
+  .pill.soon { background: var(--warn-soft); color: var(--warn); }
+  .empty { text-align: center; padding: 28px 16px; color: var(--muted); font-size: 13.5px; }
+  .tag { font-size: 11px; padding: 2px 9px; border-radius: 6px; font-weight: 600; white-space: nowrap; display: inline-block; }
+  .tag.pro { background: #e6f0ff; color: #2b5ce6; }
+  .tag.particulier { background: #eef2f6; color: #5b6577; }
+  :root[data-theme="dark"] .tag.pro { background: #1b2536; color: #6b90ff; }
+  :root[data-theme="dark"] .tag.particulier { background: #232b38; color: #99a4b5; }
+  .total-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 16px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; margin-top: 8px; }
+  .total-card .tc-lbl { font-size: 12.5px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .03em; }
+  .total-card .tc-val { font-size: 20px; font-weight: 700; color: var(--accent); }
+
+  .tabs { display: flex; gap: 4px; padding: 4px; background: var(--bg); border-radius: 9px; margin-bottom: 16px; }
+  .tabs button { flex: 1; padding: 8px; border: none; background: transparent; color: var(--muted); border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 13px; }
+  .tabs button.active { background: var(--panel); color: var(--text); box-shadow: var(--shadow); }
+
+  .detail-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+  .detail-head .avatar { width: 52px; height: 52px; font-size: 18px; border-radius: 11px; }
+  .detail-title h2 { margin: 0 0 2px; font-size: 20px; letter-spacing: -.01em; }
+  .detail-title p { margin: 0; color: var(--muted); font-size: 13px; }
+  .head-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; margin-bottom: 6px; }
+  @media (max-width: 520px) { .info-grid { grid-template-columns: 1fr; } }
+  .info-item .lbl { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+  .info-item .val { font-size: 14.5px; word-break: break-word; }
+  .info-item .val a { color: var(--accent); text-decoration: none; }
+  .info-item .val a:hover { text-decoration: underline; }
+  .info-item .val.muted { color: var(--muted); }
+
+  .section-title { font-size: 13px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 22px 0 10px; }
+
+  .sub-add { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .sub-add input { flex: 1; min-width: 120px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); }
+  .sub-add input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .line-list { list-style: none; margin: 0; padding: 0; }
+  .line-list li { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--bg); }
+  .line-list .li-main { flex: 1; min-width: 0; }
+  .line-list .li-t { font-weight: 600; font-size: 14px; }
+  .line-list .li-s { font-size: 12px; color: var(--muted); }
+  .line-list .li-amt { font-weight: 650; font-size: 14px; white-space: nowrap; }
+  .x { border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 5px; font-size: 16px; line-height: 1; }
+  .x:hover { background: var(--danger-soft); color: var(--danger); }
+  .chk { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; flex: none; }
+
+  .task-done .li-t { text-decoration: line-through; color: var(--muted); }
+  .date-badge { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 7px; white-space: nowrap; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+  .date-badge.due { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+  .date-badge.soon { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+
+  .agenda-item { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 7px; cursor: pointer; transition: background .12s; }
+  .agenda-item:hover { background: var(--bg); }
+  .agenda-when { text-align: center; min-width: 52px; flex: none; }
+  .agenda-when .d { font-size: 18px; font-weight: 700; line-height: 1; }
+  .agenda-when .m { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  .agenda-main { flex: 1; min-width: 0; }
+  .agenda-main .at { font-weight: 600; font-size: 14px; }
+  .agenda-main .ac { font-size: 12.5px; color: var(--muted); }
+
+  .modal-bg { position: fixed; inset: 0; background: rgba(15,20,30,.5); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--panel); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.3); width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+  .modal-h { padding: 17px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--panel); }
+  .modal-h h3 { margin: 0; font-size: 17px; }
+  .modal-b { padding: 20px; }
+  .modal-f { padding: 15px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; position: sticky; bottom: 0; background: var(--panel); }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--text); color: var(--panel); padding: 11px 18px; border-radius: 9px; font-size: 14px; font-weight: 500; opacity: 0; transition: all .25s; z-index: 60; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  .placeholder { text-align: center; padding: 70px 20px; color: var(--muted); }
+  .placeholder svg { margin-bottom: 14px; opacity: .5; }
+  .placeholder h3 { margin: 0 0 6px; color: var(--text); font-weight: 600; }
+
+  .hidden { display: none !important; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+
+  /* Auth screen */
+  .auth-wrap { min-height: 88vh; display: grid; place-items: center; padding: 20px; }
+  .auth-card { width: 100%; max-width: 400px; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 32px 28px; }
+  .auth-card .logo { width: 46px; height: 46px; font-size: 20px; border-radius: 12px; margin-bottom: 18px; }
+  .auth-card h2 { margin: 0 0 4px; font-size: 22px; letter-spacing: -.01em; }
+  .auth-card .sub { margin: 0 0 22px; color: var(--muted); font-size: 13.5px; }
+  .auth-msg { font-size: 13px; padding: 9px 12px; border-radius: 8px; margin-bottom: 14px; display: none; }
+  .auth-msg.err { display: block; background: var(--danger-soft); color: var(--danger); }
+  .auth-msg.ok { display: block; background: #e4f6ec; color: var(--ok); }
+  .auth-toggle { text-align: center; margin-top: 16px; font-size: 13.5px; color: var(--muted); }
+  .auth-toggle a { color: var(--accent); cursor: pointer; font-weight: 600; text-decoration: none; }
+  .user-chip { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .user-chip button { border: 1px solid var(--border); background: transparent; color: var(--muted); border-radius: 7px; padding: 4px 10px; cursor: pointer; font-size: 12px; font-weight: 600; }
+  .user-chip button:hover { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div class="app hidden" id="authScreen">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="logo" style="background:linear-gradient(135deg,var(--accent),#7aa0ff);display:grid;place-items:center;color:#fff;font-weight:700">CR</div>
+      <h2 id="authTitle">Connexion</h2>
+      <p class="sub" id="authSub">Accédez à votre CRM sécurisé</p>
+      <div class="auth-msg" id="authMsg"></div>
+      <div class="field"><label>Email</label><input id="auth_email" type="email" placeholder="vous@exemple.com"></div>
+      <div class="field"><label>Mot de passe</label><input id="auth_pass" type="password" placeholder="••••••••"></div>
+      <button class="btn block" id="auth_submit">Se connecter</button>
+      <div class="auth-toggle" id="authToggle">
+        Pas encore de compte ? <a id="authSwitch">Créer un compte</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div class="app hidden" id="appScreen">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">CR</div>
+      <div>
+        <h1>CRM — Gestion Clients</h1>
+        <p>Suivi clients, factures, commandes & actions</p>
+      </div>
+    </div>
+    <div class="user-chip">
+      <span class="dot" id="statusDot"></span>
+      <span id="userEmail"></span>
+      <button id="btnLogout">Déconnexion</button>
+      <span id="statusText" class="hidden"></span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: client list -->
+    <aside>
+      <div class="panel">
+        <div class="panel-h">
+          <h2>Clients</h2>
+          <button class="btn sm" id="btnNew">+ Nouveau</button>
+        </div>
+        <div class="panel-b">
+          <div class="search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="searchInput" placeholder="Rechercher un client…">
+          </div>
+          <ul class="clist" id="clientList"></ul>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT: detail / agenda -->
+    <main>
+      <div class="panel">
+        <div class="panel-b" id="mainArea">
+          <!-- rendered by JS -->
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Client form modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="modal-h">
+      <h3 id="modalTitle">Nouveau client</h3>
+      <button class="x" id="modalClose">✕</button>
+    </div>
+    <div class="modal-b">
+      <div class="row2">
+        <div class="field"><label>Prénom</label><input id="f_prenom" type="text"></div>
+        <div class="field"><label>Nom</label><input id="f_nom" type="text"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Téléphone</label><input id="f_tel" type="tel"></div>
+        <div class="field"><label>Email</label><input id="f_mail" type="email"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Type de client</label>
+          <select id="f_type">
+            <option value="particulier">Particulier</option>
+            <option value="pro">Professionnel</option>
+          </select>
+        </div>
+        <div class="field"><label>Société (si pro)</label><input id="f_societe" type="text"></div>
+      </div>
+      <div class="field"><label>Adresse</label><textarea id="f_adresse"></textarea></div>
+      <div class="field"><label>Informations générales</label><textarea id="f_infos" placeholder="Notes, contexte, préférences…"></textarea></div>
+    </div>
+    <div class="modal-f">
+      <button class="btn ghost" id="modalCancel">Annuler</button>
+      <button class="btn" id="modalSave">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- CONFIG SUPABASE ----------
+  var SUPABASE_URL = "https://pqasjbrzcxiwnhddcnup.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYXNqYnJ6Y3hpd25oZGRjbnVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5ODI2NTQsImV4cCI6MjEwNTU1ODY1NH0.nOWQgvVWhKBHjfvrtY3ZrAoTsqEGsieX2hQmJFXQL8E";
+  if(!window.supabase || !window.supabase.createClient){
+    document.body.innerHTML = '<div style="max-width:460px;margin:80px auto;font-family:sans-serif;padding:24px;border:1px solid #e8edf4;border-radius:12px"><h2>Librairie Supabase non chargée</h2><p style="color:#7a8598">La connexion à Supabase n\'a pas pu se faire. Vérifiez votre connexion internet et rechargez la page. Ce fichier doit être hébergé (Netlify, Vercel…) pour fonctionner.</p></div>';
+    throw new Error("Supabase library not loaded");
+  }
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ---------- State ----------
+  var currentUser = null;
+  var clients = [];          // [{id, data}]
+  var selectedId = null;
+  var editingId = null;      // client id being edited in modal, or null for new
+
+  var AVATAR_COLORS = ["#2b5ce6","#1f9d63","#e08600","#8e44d4","#d64545","#0d9488","#c2410c","#4f46e5"];
+
+  // ---------- Utilities ----------
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function uid(){
+    if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0,v=c==="x"?r:(r&0x3|0x8);return v.toString(16);});
+  }
+  function shortId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+  function initials(c){ var a=(c.prenom||"").trim(), b=(c.nom||"").trim(); return ((a[0]||"")+(b[0]||"")).toUpperCase() || "?"; }
+  function fullName(c){ return ((c.prenom||"")+" "+(c.nom||"")).trim() || "Sans nom"; }
+  function colorFor(id){ var h=0; for(var i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))>>>0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; }
+  function toast(msg){ var t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove("show");},2200); }
+
+  function fmtDate(iso){
+    if(!iso) return "";
+    var d=new Date(iso+"T00:00:00");
+    return d.toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
+  }
+  function dayNum(iso){ return new Date(iso+"T00:00:00").getDate(); }
+  function monthShort(iso){ return new Date(iso+"T00:00:00").toLocaleDateString("fr-FR",{month:"short"}).replace(".",""); }
+  function todayISO(){ var d=new Date(); return d.toISOString().slice(0,10); }
+  function daysUntil(iso){ var t=new Date(todayISO()+"T00:00:00"), d=new Date(iso+"T00:00:00"); return Math.round((d-t)/86400000); }
+  function urgencyClass(iso){ if(!iso) return ""; var n=daysUntil(iso); if(n<0||n===0) return "due"; if(n<=3) return "soon"; return ""; }
+  function parseAmount(v){ if(v==null) return 0; var n=parseFloat(String(v).replace(",",".").replace(/[^0-9.\-]/g,"")); return isNaN(n)?0:n; }
+  function sumCommandes(c){ return (c.commandes||[]).reduce(function(t,o){ return t+parseAmount(o.amount); },0); }
+  function fmtEuro(n){ return n.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €"; }
+  function isPro(c){ return c.type==="pro"; }
+
+  // Default empty client shape
+  function emptyClient(){
+    return { prenom:"", nom:"", tel:"", mail:"", societe:"", adresse:"", infos:"", type:"particulier",
+             factures:[], commandes:[], actions:[], createdAt:new Date().toISOString() };
+  }
+
+  // ---------- Persistence layer (Supabase) ----------
+  async function persist(client){
+    try {
+      var row = Object.assign({ id: client.id, user_id: currentUser.id }, mapToRow(client.data));
+      var res = await sb.from("clients").upsert(row).select();
+      if(res.error) throw res.error;
+      // keep local copy in sync
+      var existing = getClient(client.id);
+      if(!existing){ clients.push({ id: client.id, data: client.data }); }
+    } catch(e){ toast("Erreur d'enregistrement"); console.error(e); }
+  }
+  async function remove(id){
+    try {
+      var res = await sb.from("clients").delete().eq("id", id);
+      if(res.error) throw res.error;
+      clients = clients.filter(function(c){ return c.id!==id; });
+      render();
+    } catch(e){ toast("Erreur suppression"); console.error(e); }
+  }
+
+  // Map internal client data <-> Supabase row columns
+  function mapToRow(d){
+    return {
+      prenom:d.prenom||"", nom:d.nom||"", tel:d.tel||"", mail:d.mail||"",
+      societe:d.societe||"", adresse:d.adresse||"", infos:d.infos||"", type:d.type||"particulier",
+      factures:d.factures||[], commandes:d.commandes||[], actions:d.actions||[],
+      created_at:d.createdAt||new Date().toISOString()
+    };
+  }
+  function mapFromRow(r){
+    return {
+      prenom:r.prenom||"", nom:r.nom||"", tel:r.tel||"", mail:r.mail||"",
+      societe:r.societe||"", adresse:r.adresse||"", infos:r.infos||"", type:r.type||"particulier",
+      factures:r.factures||[], commandes:r.commandes||[], actions:r.actions||[],
+      createdAt:r.created_at||new Date().toISOString()
+    };
+  }
+
+  async function loadClients(){
+    try {
+      var res = await sb.from("clients").select("*").order("created_at",{ascending:true});
+      if(res.error) throw res.error;
+      clients = (res.data||[]).map(function(r){ return { id:r.id, data:mapFromRow(r) }; });
+      render();
+    } catch(e){ toast("Erreur de chargement"); console.error(e); }
+  }
+
+  // ---------- Boot / Auth ----------
+  async function boot(){
+    $("statusDot").className = "dot on";
+    $("statusText").textContent = "Supabase · sécurisé";
+    var sess = await sb.auth.getSession();
+    if(sess.data.session){
+      currentUser = sess.data.session.user;
+      showApp();
+    } else {
+      showAuth();
+    }
+    sb.auth.onAuthStateChange(function(_evt, session){
+      if(session){ currentUser = session.user; showApp(); }
+      else { currentUser = null; showAuth(); }
+    });
+  }
+
+  function showAuth(){
+    $("authScreen").classList.remove("hidden");
+    $("appScreen").classList.add("hidden");
+  }
+  async function showApp(){
+    $("authScreen").classList.add("hidden");
+    $("appScreen").classList.remove("hidden");
+    $("userEmail").textContent = currentUser.email || "";
+    await loadClients();
+  }
+
+  // ---------- Rendering ----------
+  function getClient(id){ for(var i=0;i<clients.length;i++) if(clients[i].id===id) return clients[i]; return null; }
+
+  function filteredClients(){
+    var q = ($("searchInput").value||"").toLowerCase().trim();
+    var arr = clients.slice().sort(function(a,b){ return fullName(a.data).localeCompare(fullName(b.data),"fr"); });
+    if(!q) return arr;
+    return arr.filter(function(c){
+      var d=c.data;
+      return (fullName(d)+" "+(d.mail||"")+" "+(d.tel||"")+" "+(d.societe||"")).toLowerCase().indexOf(q)>=0;
+    });
+  }
+
+  function nextActionFor(c){
+    var open = (c.actions||[]).filter(function(a){ return !a.done && a.date; });
+    open.sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); });
+    return open[0] || null;
+  }
+
+  function renderList(){
+    var ul = $("clientList");
+    var arr = filteredClients();
+    if(!arr.length){
+      ul.innerHTML = '<div class="empty">Aucun client.<br>Cliquez sur « + Nouveau ».</div>';
+      return;
+    }
+    ul.innerHTML = arr.map(function(c){
+      var d=c.data, na=nextActionFor(d);
+      var meta = "";
+      if(na){ var u=urgencyClass(na.date); if(u) meta = '<span class="pill '+(u==="due"?"due":"soon")+'">'+(u==="due"?"À faire":"Bientôt")+'</span>'; }
+      return '<li data-id="'+c.id+'" class="'+(c.id===selectedId?"active":"")+'">'+
+        '<div class="avatar" style="background:'+colorFor(c.id)+'">'+esc(initials(d))+'</div>'+
+        '<div style="min-width:0">'+
+          '<div class="cl-name">'+esc(fullName(d))+'</div>'+
+          '<div class="cl-sub"><span class="tag '+(isPro(d)?"pro":"particulier")+'" style="font-size:10px;padding:1px 6px;margin-right:5px">'+(isPro(d)?"Pro":"Part.")+'</span>'+esc(d.societe || d.mail || d.tel || "—")+'</div>'+
+        '</div>'+
+        '<div class="cl-meta">'+meta+'</div>'+
+      '</li>';
+    }).join("");
+    Array.prototype.forEach.call(ul.querySelectorAll("li"), function(li){
+      li.addEventListener("click", function(){ selectedId = li.getAttribute("data-id"); render(); });
+    });
+  }
+
+  function renderMain(){
+    var area = $("mainArea");
+    if(!selectedId || !getClient(selectedId)){
+      area.innerHTML = renderAgenda();
+      bindAgenda();
+      return;
+    }
+    var c = getClient(selectedId), d = c.data;
+
+    var facturesHTML = (d.factures||[]).map(function(f){
+      return '<li data-fid="'+f.id+'">'+
+        '<div class="li-main"><div class="li-t">'+esc(f.label||"Facture")+'</div>'+
+        '<div class="li-s">'+esc(f.date?fmtDate(f.date):"")+(f.status?" · "+esc(f.status):"")+'</div></div>'+
+        (f.amount?'<div class="li-amt">'+esc(f.amount)+' €</div>':'')+
+        '<button class="x" data-del-fac="'+f.id+'">✕</button></li>';
+    }).join("") || '<div class="empty" style="padding:12px">Aucune facture.</div>';
+
+    var commandesHTML = (d.commandes||[]).map(function(o){
+      return '<li data-oid="'+o.id+'">'+
+        '<div class="li-main"><div class="li-t">'+esc(o.label||"Commande")+'</div>'+
+        '<div class="li-s">'+esc(o.date?fmtDate(o.date):"")+(o.status?" · "+esc(o.status):"")+'</div></div>'+
+        (o.amount?'<div class="li-amt">'+esc(o.amount)+' €</div>':'')+
+        '<button class="x" data-del-cmd="'+o.id+'">✕</button></li>';
+    }).join("") || '<div class="empty" style="padding:12px">Aucune commande.</div>';
+
+    var actions = (d.actions||[]).slice().sort(function(a,b){
+      if(a.done!==b.done) return a.done?1:-1;
+      return (a.date||"9999").localeCompare(b.date||"9999");
+    });
+    var actionsHTML = actions.map(function(a){
+      var badge = a.date ? '<span class="date-badge '+urgencyClass(a.date)+'">'+esc(fmtDate(a.date))+'</span>' : '';
+      return '<li class="'+(a.done?"task-done":"")+'" data-aid="'+a.id+'">'+
+        '<input type="checkbox" class="chk" data-toggle="'+a.id+'" '+(a.done?"checked":"")+'>'+
+        '<div class="li-main"><div class="li-t">'+esc(a.label)+'</div></div>'+
+        badge+
+        '<button class="x" data-del-act="'+a.id+'">✕</button></li>';
+    }).join("") || '<div class="empty" style="padding:12px">Aucune action prévue.</div>';
+
+    area.innerHTML =
+      '<div class="detail-head">'+
+        '<div class="avatar" style="background:'+colorFor(c.id)+'">'+esc(initials(d))+'</div>'+
+        '<div class="detail-title">'+
+          '<h2>'+esc(fullName(d))+' <span class="tag '+(isPro(d)?"pro":"particulier")+'" style="vertical-align:middle;font-size:12px">'+(isPro(d)?"Pro":"Particulier")+'</span></h2>'+
+          '<p>'+esc(isPro(d)?(d.societe||"Professionnel"):"Particulier")+'</p>'+
+        '</div>'+
+        '<div class="head-actions">'+
+          '<button class="btn ghost sm" id="btnBack">← Actions à venir</button>'+
+          '<button class="btn ghost sm" id="btnEdit">Modifier</button>'+
+          '<button class="btn danger sm" id="btnDelete">Supprimer</button>'+
+        '</div>'+
+      '</div>'+
+
+      '<div class="info-grid">'+
+        infoItem("Téléphone", d.tel ? '<a href="tel:'+esc(d.tel)+'">'+esc(d.tel)+'</a>' : '<span class="muted">—</span>')+
+        infoItem("Email", d.mail ? '<a href="mailto:'+esc(d.mail)+'">'+esc(d.mail)+'</a>' : '<span class="muted">—</span>')+
+        infoItem("Adresse", d.adresse ? esc(d.adresse).replace(/\n/g,"<br>") : '<span class="muted">—</span>')+
+        infoItem("Client depuis", d.createdAt ? esc(new Date(d.createdAt).toLocaleDateString("fr-FR")) : '<span class="muted">—</span>')+
+      '</div>'+
+      (d.infos ? '<div class="info-item" style="margin-top:12px"><div class="lbl">Informations générales</div><div class="val">'+esc(d.infos).replace(/\n/g,"<br>")+'</div></div>' : '')+
+
+      '<div class="section-title">Prochaines actions</div>'+
+      '<div class="sub-add">'+
+        '<input type="text" id="act_label" placeholder="Action à faire (ex : rappeler pour devis)">'+
+        '<input type="date" id="act_date" style="max-width:160px">'+
+        '<button class="btn sm" id="act_add">Ajouter</button>'+
+      '</div>'+
+      '<ul class="line-list" id="actList">'+actionsHTML+'</ul>'+
+
+      '<div class="section-title">Factures</div>'+
+      '<div class="sub-add">'+
+        '<input type="text" id="fac_label" placeholder="Libellé (ex : Facture #2024-012)">'+
+        '<input type="text" id="fac_amount" placeholder="€" style="max-width:80px">'+
+        '<input type="date" id="fac_date" style="max-width:150px">'+
+        '<button class="btn sm" id="fac_add">Ajouter</button>'+
+      '</div>'+
+      '<ul class="line-list" id="facList">'+facturesHTML+'</ul>'+
+
+      '<div class="section-title">Commandes</div>'+
+      '<div class="total-card"><span class="tc-lbl">Total des commandes</span><span class="tc-val">'+fmtEuro(sumCommandes(d))+'</span></div>'+
+      '<div class="sub-add" style="margin-top:12px">'+
+        '<input type="text" id="cmd_label" placeholder="Libellé (ex : Commande matériel)">'+
+        '<input type="text" id="cmd_amount" placeholder="€" style="max-width:80px">'+
+        '<input type="date" id="cmd_date" style="max-width:150px">'+
+        '<button class="btn sm" id="cmd_add">Ajouter</button>'+
+      '</div>'+
+      '<ul class="line-list" id="cmdList">'+commandesHTML+'</ul>';
+
+    bindDetail(c);
+  }
+
+  function infoItem(lbl, val){
+    return '<div class="info-item"><div class="lbl">'+esc(lbl)+'</div><div class="val">'+val+'</div></div>';
+  }
+
+  function renderAgenda(){
+    // Aggregate all open actions across clients, chronological
+    var items = [];
+    clients.forEach(function(c){
+      (c.data.actions||[]).forEach(function(a){
+        if(!a.done && a.date){
+          items.push({ clientId:c.id, clientName:fullName(c.data), label:a.label, date:a.date });
+        }
+      });
+    });
+    items.sort(function(a,b){ return a.date.localeCompare(b.date); });
+
+    var list;
+    if(!items.length){
+      list = '<div class="placeholder">'+
+        '<svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>'+
+        '<h3>Aucune action à venir</h3>'+
+        '<p>Sélectionnez un client pour ajouter des actions,<br>ou créez un nouveau client.</p>'+
+      '</div>';
+    } else {
+      list = items.map(function(it){
+        var u = urgencyClass(it.date);
+        return '<div class="agenda-item" data-goto="'+it.clientId+'">'+
+          '<div class="agenda-when"><div class="d" style="'+(u==="due"?"color:var(--danger)":u==="soon"?"color:var(--warn)":"")+'">'+dayNum(it.date)+'</div><div class="m">'+esc(monthShort(it.date))+'</div></div>'+
+          '<div class="agenda-main"><div class="at">'+esc(it.label)+'</div><div class="ac">'+esc(it.clientName)+' · '+esc(fmtDate(it.date))+'</div></div>'+
+          (u?'<span class="date-badge '+u+'">'+(u==="due"?"À faire":"Bientôt")+'</span>':'')+
+        '</div>';
+      }).join("");
+    }
+
+    return '<div class="detail-head"><div class="detail-title"><h2>Actions à venir</h2>'+
+      '<p>Toutes les actions planifiées, par ordre chronologique</p></div></div>'+list;
+  }
+
+  function bindAgenda(){
+    Array.prototype.forEach.call(document.querySelectorAll("[data-goto]"), function(el){
+      el.addEventListener("click", function(){ selectedId = el.getAttribute("data-goto"); render(); });
+    });
+  }
+
+  // ---------- Detail event binding ----------
+  function bindDetail(c){
+    var d = c.data;
+    $("btnBack").addEventListener("click", function(){ selectedId=null; render(); });
+    $("btnEdit").addEventListener("click", function(){ openModal(c.id); });
+    $("btnDelete").addEventListener("click", function(){
+      if(confirm("Supprimer définitivement "+fullName(d)+" ?")){ remove(c.id); selectedId=null; render(); }
+    });
+
+    // Add action
+    $("act_add").addEventListener("click", function(){
+      var label=($("act_label").value||"").trim(), date=$("act_date").value;
+      if(!label){ toast("Saisissez une action"); return; }
+      d.actions = d.actions||[]; d.actions.push({ id:shortId(), label:label, date:date||"", done:false });
+      persist(c).then(render); toast("Action ajoutée");
+    });
+    $("act_label").addEventListener("keydown", function(e){ if(e.key==="Enter") $("act_add").click(); });
+
+    // Add facture
+    $("fac_add").addEventListener("click", function(){
+      var label=($("fac_label").value||"").trim();
+      if(!label){ toast("Saisissez un libellé"); return; }
+      d.factures=d.factures||[]; d.factures.push({ id:shortId(), label:label, amount:($("fac_amount").value||"").trim(), date:$("fac_date").value||"", status:"" });
+      persist(c).then(render); toast("Facture ajoutée");
+    });
+    // Add commande
+    $("cmd_add").addEventListener("click", function(){
+      var label=($("cmd_label").value||"").trim();
+      if(!label){ toast("Saisissez un libellé"); return; }
+      d.commandes=d.commandes||[]; d.commandes.push({ id:shortId(), label:label, amount:($("cmd_amount").value||"").trim(), date:$("cmd_date").value||"", status:"" });
+      persist(c).then(render); toast("Commande ajoutée");
+    });
+
+    // Toggle / delete actions
+    Array.prototype.forEach.call(document.querySelectorAll("[data-toggle]"), function(el){
+      el.addEventListener("change", function(){
+        var id=el.getAttribute("data-toggle"), a=(d.actions||[]).find(function(x){return x.id===id;});
+        if(a){ a.done=el.checked; persist(c).then(render); }
+      });
+    });
+    delegateDelete("data-del-act", function(id){ d.actions=(d.actions||[]).filter(function(x){return x.id!==id;}); persist(c).then(render); });
+    delegateDelete("data-del-fac", function(id){ d.factures=(d.factures||[]).filter(function(x){return x.id!==id;}); persist(c).then(render); });
+    delegateDelete("data-del-cmd", function(id){ d.commandes=(d.commandes||[]).filter(function(x){return x.id!==id;}); persist(c).then(render); });
+  }
+
+  function delegateDelete(attr, fn){
+    Array.prototype.forEach.call(document.querySelectorAll("["+attr+"]"), function(el){
+      el.addEventListener("click", function(){ fn(el.getAttribute(attr)); });
+    });
+  }
+
+  // ---------- Modal ----------
+  function openModal(id){
+    editingId = id || null;
+    $("modalTitle").textContent = id ? "Modifier le client" : "Nouveau client";
+    var d = id ? getClient(id).data : emptyClient();
+    $("f_prenom").value=d.prenom||""; $("f_nom").value=d.nom||""; $("f_tel").value=d.tel||"";
+    $("f_mail").value=d.mail||""; $("f_societe").value=d.societe||""; $("f_adresse").value=d.adresse||"";
+    $("f_infos").value=d.infos||""; $("f_type").value=d.type||"particulier";
+    $("modalBg").classList.add("open");
+    setTimeout(function(){ $("f_prenom").focus(); },50);
+  }
+  function closeModal(){ $("modalBg").classList.remove("open"); editingId=null; }
+
+  async function saveModal(){
+    var prenom=($("f_prenom").value||"").trim(), nom=($("f_nom").value||"").trim();
+    if(!prenom && !nom){ toast("Nom ou prénom requis"); return; }
+    if(editingId){
+      var c=getClient(editingId), d=c.data;
+      d.prenom=prenom; d.nom=nom; d.tel=$("f_tel").value.trim(); d.mail=$("f_mail").value.trim();
+      d.societe=$("f_societe").value.trim(); d.adresse=$("f_adresse").value.trim(); d.infos=$("f_infos").value.trim(); d.type=$("f_type").value;
+      await persist(c).then(render);
+      selectedId=editingId; toast("Client mis à jour");
+    } else {
+      var nc = emptyClient();
+      nc.prenom=prenom; nc.nom=nom; nc.tel=$("f_tel").value.trim(); nc.mail=$("f_mail").value.trim();
+      nc.societe=$("f_societe").value.trim(); nc.adresse=$("f_adresse").value.trim(); nc.infos=$("f_infos").value.trim(); nc.type=$("f_type").value;
+      var newId=uid();
+      await persist({id:newId,data:nc});
+      selectedId=newId; toast("Client créé");
+    }
+    closeModal();
+    render();
+  }
+
+  // ---------- Render orchestrator ----------
+  function render(){ renderList(); renderMain(); }
+
+  // ---------- Auth handlers ----------
+  var authMode = "login"; // or "signup"
+  function setAuthMsg(txt, kind){
+    var m=$("authMsg"); m.textContent=txt; m.className="auth-msg "+(kind||"");
+  }
+  function switchAuthMode(){
+    authMode = (authMode==="login") ? "signup" : "login";
+    if(authMode==="signup"){
+      $("authTitle").textContent="Créer un compte";
+      $("authSub").textContent="Inscrivez-vous pour accéder à votre CRM";
+      $("auth_submit").textContent="Créer mon compte";
+      $("authToggle").innerHTML='Déjà un compte ? <a id="authSwitch">Se connecter</a>';
+    } else {
+      $("authTitle").textContent="Connexion";
+      $("authSub").textContent="Accédez à votre CRM sécurisé";
+      $("auth_submit").textContent="Se connecter";
+      $("authToggle").innerHTML='Pas encore de compte ? <a id="authSwitch">Créer un compte</a>';
+    }
+    setAuthMsg("","");
+    $("authSwitch").addEventListener("click", switchAuthMode);
+  }
+
+  async function doAuth(){
+    var email=($("auth_email").value||"").trim(), pass=$("auth_pass").value||"";
+    if(!email || !pass){ setAuthMsg("Email et mot de passe requis.","err"); return; }
+    $("auth_submit").disabled=true;
+    try {
+      var res;
+      if(authMode==="signup"){
+        res = await sb.auth.signUp({ email:email, password:pass });
+        if(res.error) throw res.error;
+        if(res.data.session){ /* auto connecté */ }
+        else { setAuthMsg("Compte créé. Vérifiez vos emails si une confirmation est demandée, sinon connectez-vous.","ok"); }
+      } else {
+        res = await sb.auth.signInWithPassword({ email:email, password:pass });
+        if(res.error) throw res.error;
+      }
+    } catch(e){
+      var msg = e.message||"Erreur";
+      if(/Invalid login/i.test(msg)) msg="Email ou mot de passe incorrect.";
+      if(/already registered/i.test(msg)) msg="Cet email est déjà utilisé.";
+      if(/at least 6/i.test(msg)) msg="Le mot de passe doit faire au moins 6 caractères.";
+      setAuthMsg(msg,"err");
+    } finally {
+      $("auth_submit").disabled=false;
+    }
+  }
+
+  // ---------- Global bindings ----------
+  $("btnNew").addEventListener("click", function(){ openModal(null); });
+  $("modalClose").addEventListener("click", closeModal);
+  $("modalCancel").addEventListener("click", closeModal);
+  $("modalSave").addEventListener("click", saveModal);
+  $("modalBg").addEventListener("click", function(e){ if(e.target===$("modalBg")) closeModal(); });
+  $("searchInput").addEventListener("input", renderList);
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape" && $("modalBg").classList.contains("open")) closeModal(); });
+
+  $("auth_submit").addEventListener("click", doAuth);
+  $("auth_pass").addEventListener("keydown", function(e){ if(e.key==="Enter") doAuth(); });
+  $("authSwitch").addEventListener("click", switchAuthMode);
+  $("btnLogout").addEventListener("click", async function(){
+    await sb.auth.signOut();
+    clients=[]; selectedId=null;
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>
