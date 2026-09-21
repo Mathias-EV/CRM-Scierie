@@ -1373,7 +1373,7 @@ window.crmDevisPDF = genererDevisPDF;
       (d.infos ? '<div class="info-item" style="margin-top:12px"><div class="lbl">Informations générales</div><div class="val">'+esc(d.infos).replace(/\n/g,"<br>")+'</div></div>' : '')+
 
       interlocHTML +
-      '<div class="section-title">Devis en cours (Cubeur)</div>'+
+      '<div class="section-title" style="display:flex;justify-content:space-between;align-items:center">Devis en cours (Cubeur)<button class="btn ghost sm" id="devisRefresh" style="text-transform:none;letter-spacing:0">↻ Actualiser</button></div>'+
       '<div id="devisBox">'+devisHTML(c.id)+'</div>'+
 
       '<div class="section-title">Prochaines actions</div>'+
@@ -1414,6 +1414,7 @@ window.crmDevisPDF = genererDevisPDF;
       '<div id="echList">'+echangesHTML+'</div>';
 
     bindDetail(c);
+    $("devisRefresh").addEventListener("click", function(){ $("devisBox").innerHTML='<div class="empty" style="padding:12px">Chargement…</div>'; loadDevis(c.id); });
     if(devisCache[c.id]===undefined) loadDevis(c.id);
   }
 
@@ -1422,9 +1423,21 @@ window.crmDevisPDF = genererDevisPDF;
   async function loadDevis(clientId){
     devisCache[clientId] = null; // chargement
     try{
+      // 1) commandes rattachées au client (choisi dans la liste du Cubeur)
       var res = await sb.from("commandes").select("*").eq("client_id", clientId).order("seq",{ascending:false});
       if(res.error) throw res.error;
-      devisCache[clientId] = res.data||[];
+      var list = res.data||[];
+      // 2) commandes non rattachées mais portant exactement le même nom de client
+      var cl = getClient(clientId);
+      var nom = cl ? displayName(cl.data).trim() : "";
+      if(nom){
+        var motif = nom; // comparaison sans tenir compte des majuscules
+        var res2 = await sb.from("commandes").select("*").is("client_id", null).ilike("client", motif).order("seq",{ascending:false});
+        if(!res2.error){
+          (res2.data||[]).forEach(function(k){ if(!list.some(function(x){ return x.id===k.id; })){ k._parNom = true; list.push(k); } });
+        }
+      }
+      devisCache[clientId] = list;
     }catch(e){ console.error(e); devisCache[clientId] = { error: e.message||"Erreur" }; }
     if(selectedId===clientId && $("devisBox")) $("devisBox").innerHTML = devisHTML(clientId);
   }
@@ -1444,7 +1457,8 @@ window.crmDevisPDF = genererDevisPDF;
     return '<li><div class="li-main">'+
       '<div class="li-t">'+esc(k.id)+(k.chantier?' <span style="font-weight:500;color:var(--muted);font-style:italic">· '+esc(k.chantier)+'</span>':'')+'</div>'+
       prods + (liv?'<div class="li-s">Livraison : '+esc(liv)+'</div>':'')+
-      '<span class="suivi-badge" style="background:'+lab[2]+';color:'+lab[1]+'">'+lab[0]+'</span>'+
+      (k.devis_statut==="en_attente" && !(k.statut==="valide"||k.statut==="Validée") ? '<span class="suivi-badge" style="background:#fff0de;color:#c26f00">Devis en attente de réponse</span>' : '<span class="suivi-badge" style="background:'+lab[2]+';color:'+lab[1]+'">'+lab[0]+'</span>')+
+      (k._parNom ? ' <span class="suivi-badge" style="background:#eef1f5;color:#5b6577" title="Commande créée sans choisir ce client dans la liste du Cubeur">rattaché par le nom</span>' : '')+
       '<div><button class="btn ghost sm" style="margin-top:8px" data-devis="'+esc(k.id)+'">📄 Ouvrir le devis</button></div>'+
       '</div>'+(ht?'<div class="li-amt">'+fmtEuro(ht)+' HT<span class="ht">'+fmtEuro(ht*1.2)+' TTC</span></div>':'')+'</li>';
   }
@@ -1471,10 +1485,18 @@ window.crmDevisPDF = genererDevisPDF;
     var d = devisCache[clientId];
     if(d===undefined || d===null) return '<div class="empty" style="padding:12px">Chargement…</div>';
     if(d.error) return '<div class="empty" style="padding:12px">Devis indisponibles ('+esc(d.error)+')</div>';
-    var enCours = d.filter(function(k){ return k.devis_statut==="accepte" && k.statut!=="brouillon" && k.statut!=="valide" && k.statut!=="Validée"; });
-    var finies = d.filter(function(k){ return k.statut==="valide" || k.statut==="Validée"; });
+    function accepte(k){ return !k.devis_statut || k.devis_statut==="accepte"; } // vide = ancienne commande = acceptée (comme dans le Cubeur)
+    function finie(k){ return k.statut==="valide" || k.statut==="Validée"; }
+    var enCours = d.filter(function(k){ return accepte(k) && k.statut!=="brouillon" && !finie(k); });
+    var enAttente = d.filter(function(k){ return k.devis_statut==="en_attente" && k.statut!=="brouillon" && !finie(k); });
+    var finies = d.filter(finie);
     var html = enCours.length ? '<ul class="line-list">'+enCours.map(devisCard).join("")+'</ul>'
       : '<div class="empty" style="padding:12px">Aucun devis accepté en cours.</div>';
+    if(enAttente.length){
+      html += '<details open style="margin-top:6px"><summary style="cursor:pointer;font-size:13px;color:var(--warn);font-weight:600">⏳ Devis en attente de réponse du client ('+enAttente.length+')</summary>'+
+        '<ul class="line-list" style="margin-top:8px">'+enAttente.map(devisCard).join("")+'</ul>'+
+        '<div class="li-s" style="margin-bottom:6px">Ils passeront dans « en cours » dès que tu cliques sur « ✓ Accepté » dans le Cubeur.</div></details>';
+    }
     if(finies.length){
       html += '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">Commandes terminées ('+finies.length+')</summary>'+
         '<ul class="line-list" style="margin-top:8px">'+finies.map(devisCard).join("")+'</ul></details>';
