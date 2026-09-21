@@ -520,7 +520,7 @@
         '</div><div class="cl-meta">'+meta+'</div></li>';
     }).join("");
     Array.prototype.forEach.call(ul.querySelectorAll("li"), function(li){
-      li.addEventListener("click", function(){ selectedId = li.getAttribute("data-id"); render(); });
+      li.addEventListener("click", function(){ selectedId = li.getAttribute("data-id"); delete devisCache[selectedId]; render(); });
     });
   }
 
@@ -595,6 +595,8 @@
       (d.infos ? '<div class="info-item" style="margin-top:12px"><div class="lbl">Informations générales</div><div class="val">'+esc(d.infos).replace(/\n/g,"<br>")+'</div></div>' : '')+
 
       interlocHTML +
+      '<div class="section-title">Devis en cours (Cubeur)</div>'+
+      '<div id="devisBox">'+devisHTML(c.id)+'</div>'+
 
       '<div class="section-title">Prochaines actions</div>'+
       '<div class="sub-add">'+
@@ -634,6 +636,52 @@
       '<div id="echList">'+echangesHTML+'</div>';
 
     bindDetail(c);
+    if(devisCache[c.id]===undefined) loadDevis(c.id);
+  }
+
+  // ---------- Devis du Cubeur liés à ce client ----------
+  var devisCache = {};   // clientId -> [commandes] | {error}
+  async function loadDevis(clientId){
+    devisCache[clientId] = null; // chargement
+    try{
+      var res = await sb.from("commandes").select("id,chantier,date_livraison,date_creation,statut,devis_statut,lignes,total_ht").eq("client_id", clientId).order("seq",{ascending:false});
+      if(res.error) throw res.error;
+      devisCache[clientId] = res.data||[];
+    }catch(e){ console.error(e); devisCache[clientId] = { error: e.message||"Erreur" }; }
+    if(selectedId===clientId && $("devisBox")) $("devisBox").innerHTML = devisHTML(clientId);
+  }
+  function statutLabel(st){
+    if(st==="production"||st==="En production") return ['En production','#0A84FF','#e6f1ff'];
+    if(st==="valide"||st==="Validée") return ['Terminée','#1f9d63','#e3f6ea'];
+    return ['En attente de sciage','#c26f00','#fff0de'];
+  }
+  function devisCard(k){
+    var lab = statutLabel(k.statut);
+    var prods = (k.lignes||[]).map(function(l){
+      var dims = (l.epaisseur&&l.largeur ? l.epaisseur+"×"+l.largeur+"mm" : "") + (l.longueur ? " · "+l.longueur+"m" : "");
+      return '<div class="li-s">• '+esc((l.produit||"—")+(l.essence?" "+l.essence:""))+(dims?' <span style="color:var(--muted)">('+esc(dims)+')</span>':'')+'</div>';
+    }).join("");
+    var ht = parseAmount(k.total_ht);
+    var liv = k.date_livraison ? (function(){ var dt=new Date(k.date_livraison); return isNaN(dt)?k.date_livraison:dt.toLocaleDateString("fr-FR"); })() : "";
+    return '<li><div class="li-main">'+
+      '<div class="li-t">'+esc(k.id)+(k.chantier?' <span style="font-weight:500;color:var(--muted);font-style:italic">· '+esc(k.chantier)+'</span>':'')+'</div>'+
+      prods + (liv?'<div class="li-s">Livraison : '+esc(liv)+'</div>':'')+
+      '<span class="suivi-badge" style="background:'+lab[2]+';color:'+lab[1]+'">'+lab[0]+'</span>'+
+      '</div>'+(ht?'<div class="li-amt">'+fmtEuro(ht)+' HT<span class="ht">'+fmtEuro(ht*1.2)+' TTC</span></div>':'')+'</li>';
+  }
+  function devisHTML(clientId){
+    var d = devisCache[clientId];
+    if(d===undefined || d===null) return '<div class="empty" style="padding:12px">Chargement…</div>';
+    if(d.error) return '<div class="empty" style="padding:12px">Devis indisponibles ('+esc(d.error)+')</div>';
+    var enCours = d.filter(function(k){ return k.devis_statut==="accepte" && k.statut!=="brouillon" && k.statut!=="valide" && k.statut!=="Validée"; });
+    var finies = d.filter(function(k){ return k.statut==="valide" || k.statut==="Validée"; });
+    var html = enCours.length ? '<ul class="line-list">'+enCours.map(devisCard).join("")+'</ul>'
+      : '<div class="empty" style="padding:12px">Aucun devis accepté en cours.</div>';
+    if(finies.length){
+      html += '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">Commandes terminées ('+finies.length+')</summary>'+
+        '<ul class="line-list" style="margin-top:8px">'+finies.map(devisCard).join("")+'</ul></details>';
+    }
+    return html;
   }
 
   function infoItem(lbl, val){ return '<div class="info-item"><div class="lbl">'+esc(lbl)+'</div><div class="val">'+val+'</div></div>'; }
