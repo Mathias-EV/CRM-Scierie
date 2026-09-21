@@ -85,6 +85,9 @@
   .tag.particulier { background: #eef2f6; color: #5b6577; }
 
   .total-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 16px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; margin: 8px 0; }
+  .totals-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; }
+  .totals-row .total-card { margin: 0; }
+  @media (max-width: 460px) { .totals-row { grid-template-columns: 1fr; } }
   .total-card .tc-lbl { font-size: 12.5px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .03em; }
   .total-card .tc-val { font-size: 20px; font-weight: 700; color: var(--accent); }
   .total-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
@@ -338,8 +341,14 @@
   function parseAmount(v){ if(v==null) return 0; var n=parseFloat(String(v).replace(",",".").replace(/[^0-9.\-]/g,"")); return isNaN(n)?0:n; }
   function fmtEuro(n){ return n.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €"; }
 
-  function sumFactures(c){ return (c.factures||[]).reduce(function(t,f){ var ttc=parseAmount(f.ttc), ht=parseAmount(f.ht); return t + (ttc||ht); },0); }
-  function sumFacturesHT(c){ return (c.factures||[]).reduce(function(t,f){ return t + parseAmount(f.ht); },0); }
+  var TVA = 0.20;
+  function htFromTtc(ttc){ return ttc / (1+TVA); }
+  function ttcFromHt(ht){ return ht * (1+TVA); }
+  // Pour chaque facture, on déduit HT et TTC (avec TVA 20%) si une seule valeur est saisie
+  function factureHT(f){ var ht=parseAmount(f.ht), ttc=parseAmount(f.ttc); if(ht) return ht; if(ttc) return htFromTtc(ttc); return 0; }
+  function factureTTC(f){ var ht=parseAmount(f.ht), ttc=parseAmount(f.ttc); if(ttc) return ttc; if(ht) return ttcFromHt(ht); return 0; }
+  function sumFacturesHT(c){ return (c.factures||[]).reduce(function(t,f){ return t + factureHT(f); },0); }
+  function sumFacturesTTC(c){ return (c.factures||[]).reduce(function(t,f){ return t + factureTTC(f); },0); }
   function clientSince(c){ var dates = (c.factures||[]).map(function(f){ return f.date; }).filter(Boolean).sort(); return dates[0] || ""; }
 
   function emptyClient(){
@@ -520,15 +529,17 @@
       '<ul class="line-list" id="actList">'+actionsHTML+'</ul>'+
 
       '<div class="section-title">Factures</div>'+
-      '<div class="total-card"><span class="tc-lbl">Total facturé</span>'+
-        '<span class="tc-val">'+fmtEuro(sumFactures(d))+' <span class="total-sub">'+(sumFacturesHT(d)?"("+fmtEuro(sumFacturesHT(d))+" HT)":"")+'</span></span></div>'+
+      '<div class="totals-row">'+
+        '<div class="total-card"><span class="tc-lbl">Total HT</span><span class="tc-val">'+fmtEuro(sumFacturesHT(d))+'</span></div>'+
+        '<div class="total-card"><span class="tc-lbl">Total TTC</span><span class="tc-val">'+fmtEuro(sumFacturesTTC(d))+'</span></div>'+
+      '</div>'+
       '<div class="sub-add">'+
         '<input type="text" id="fac_label" placeholder="Libellé (ex : Facture #2026-012)">'+
         '<input type="date" id="fac_date" class="date">'+
       '</div>'+
       '<div class="sub-add">'+
         '<input type="text" id="fac_ht" class="narrow" placeholder="Montant HT">'+
-        '<input type="text" id="fac_ttc" class="narrow" placeholder="Montant TTC">'+
+        '<input type="text" id="fac_ttc" class="narrow" placeholder="Montant TTC (auto 20%)">'+
         '<input type="text" id="fac_note" placeholder="Note (facultatif)">'+
       '</div>'+
       '<div class="sub-add">'+
@@ -591,6 +602,22 @@
       persist(c).then(render); toast("Action ajoutée");
     });
     $("act_label").addEventListener("keydown", function(e){ if(e.key==="Enter") $("act_add").click(); });
+
+    // Calcul automatique HT <-> TTC (TVA 20%)
+    var htEl=$("fac_ht"), ttcEl=$("fac_ttc"), lockCalc=false;
+    function money(n){ return (Math.round(n*100)/100).toString().replace(".",","); }
+    htEl.addEventListener("input", function(){
+      if(lockCalc) return; lockCalc=true;
+      var v=htEl.value.trim();
+      ttcEl.value = v==="" ? "" : money(ttcFromHt(parseAmount(v)));
+      lockCalc=false;
+    });
+    ttcEl.addEventListener("input", function(){
+      if(lockCalc) return; lockCalc=true;
+      var v=ttcEl.value.trim();
+      htEl.value = v==="" ? "" : money(htFromTtc(parseAmount(v)));
+      lockCalc=false;
+    });
 
     $("fac_add").addEventListener("click", async function(){
       var label=($("fac_label").value||"").trim();
