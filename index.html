@@ -174,6 +174,19 @@
   .placeholder h3 { margin: 0 0 6px; color: var(--text); font-weight: 600; }
 
   .hidden { display: none !important; }
+  #mapBox { height: 340px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 8px; }
+  .leaflet-container { font: inherit; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 6px; }
+  .kpi { border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; background: var(--bg); }
+  .kpi .k-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  .kpi .k-val { font-size: 19px; font-weight: 700; margin-top: 2px; }
+  .kpi .k-sub { font-size: 11.5px; color: var(--muted); }
+  .chart-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: var(--panel); }
+  .chart-card h4 { margin: 0 0 8px; font-size: 13px; font-weight: 650; }
+  .chart-card svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+  .cat { font-size: 11px; padding: 2px 9px; border-radius: 6px; font-weight: 600; display: inline-block; }
   .swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
   .swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
   .swatch.sel { border-color: var(--text); }
@@ -199,6 +212,8 @@
   .user-chip button { border: 1px solid var(--border); background: transparent; color: var(--muted); border-radius: 7px; padding: 4px 10px; cursor: pointer; font-size: 12px; font-weight: 600; }
   .user-chip button:hover { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -306,7 +321,17 @@
         </div>
       </div>
 
+      <div class="field"><label>Catégorie du client</label>
+        <select id="f_categorie"></select>
+      </div>
       <div class="field"><label>Adresse</label><textarea id="f_adresse"></textarea></div>
+      <div class="field"><label>Point GPS (pour la carte)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="f_gps" type="text" placeholder="45.0412, 4.8123" style="flex:1;min-width:150px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)">
+          <button class="btn ghost" id="btnGeo" type="button">📍 Depuis l'adresse</button>
+        </div>
+        <div id="geoMsg" style="font-size:12px;color:var(--muted);margin-top:6px">Laissez vide si inutile. Vous pouvez aussi coller des coordonnées copiées depuis Google Maps.</div>
+      </div>
       <div class="field"><label>Informations générales</label><textarea id="f_infos" placeholder="Notes, contexte, préférences…"></textarea></div>
     </div>
     <div class="modal-f">
@@ -1152,7 +1177,7 @@ window.crmDevisPDF = genererDevisPDF;
 
   function emptyClient(){
     return { type:"particulier", prenom:"", nom:"", tel:"", mail:"", societe:"",
-             interlocuteurs:[], adresse:"", infos:"", suivi:"",
+             interlocuteurs:[], adresse:"", infos:"", suivi:"", categorie:"", lat:null, lng:null,
              factures:[], echanges:[], actions:[], createdAt:new Date().toISOString() };
   }
 
@@ -1188,16 +1213,107 @@ window.crmDevisPDF = genererDevisPDF;
     }
   }
 
+  // ---------- Catégories de client ----------
+  var CATEGORIES = [
+    {v:"majeur",       l:"Client majeur",       bg:"#e3f6ea", fg:"#1f9d63"},
+    {v:"intermediaire",l:"Client intermédiaire",bg:"#e6efff", fg:"#2b5ce6"},
+    {v:"mineur",       l:"Client mineur",       bg:"#eef1f5", fg:"#5b6577"},
+    {v:"ponctuel",     l:"Ponctuel / one-shot", bg:"#fff8d4", fg:"#a88400"},
+    {v:"prospect",     l:"Prospect",            bg:"#f1e8ff", fg:"#7d45cf"},
+    {v:"inactif",      l:"Inactif",             bg:"#fceaea", fg:"#c0392b"}
+  ];
+  function cat(v){ for(var i=0;i<CATEGORIES.length;i++) if(CATEGORIES[i].v===v) return CATEGORIES[i]; return null; }
+
+  // ---------- Statistiques client ----------
+  function moisCle(iso){ return String(iso||"").slice(0,7); }
+  function derniersMois(n){
+    var out=[], d=new Date(); d.setDate(1);
+    for(var i=n-1;i>=0;i--){ var x=new Date(d.getFullYear(), d.getMonth()-i, 1); out.push(x.toISOString().slice(0,7)); }
+    return out;
+  }
+  function labelMois(k){ var p=k.split("-"); return new Date(+p[0], +p[1]-1, 1).toLocaleDateString("fr-FR",{month:"short"}).replace(".",""); }
+  function statsClient(d){
+    var caTotal=sumFacturesHT(d), nbEch=(d.echanges||[]).length, nbFac=(d.factures||[]).length;
+    var mois=derniersMois(12);
+    var caMois=mois.map(function(m){ return (d.factures||[]).filter(function(f){ return moisCle(f.date)===m; }).reduce(function(t,f){ return t+factureHT(f); },0); });
+    var echMois=mois.map(function(m){ return (d.echanges||[]).filter(function(e){ return moisCle(e.date)===m; }).length; });
+    var dates=(d.echanges||[]).map(function(e){ return e.date; }).filter(Boolean).sort();
+    return { caTotal:caTotal, nbEch:nbEch, nbFac:nbFac, mois:mois, caMois:caMois, echMois:echMois,
+             parEchange: nbEch? caTotal/nbEch : 0, panier: nbFac? caTotal/nbFac : 0,
+             dernierEch: dates.length?dates[dates.length-1]:"", premierEch: dates.length?dates[0]:"" };
+  }
+  function moyenneParEchange(){
+    var tot=0, n=0;
+    clients.forEach(function(c){ var e=(c.data.echanges||[]).length; if(e>0){ tot+=sumFacturesHT(c.data); n+=e; } });
+    return n? tot/n : 0;
+  }
+
+  // ---------- Graphiques (SVG, sans librairie) ----------
+  function fmtCourt(n){ if(n>=1000) return Math.round(n/1000)+"k"; return Math.round(n).toString(); }
+  function barChart(labels, values, couleur, suffixe){
+    var W=600,H=200,L=44,R=10,T=12,B=26, iw=W-L-R, ih=H-T-B;
+    var max=Math.max.apply(null, values.concat([1])); max=max*1.15;
+    var bw=iw/values.length*0.62, step=iw/values.length;
+    var g="";
+    [0,0.5,1].forEach(function(f){ var y=T+ih-ih*f; g+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="var(--border)" stroke-width="1"/>'+
+      '<text x="'+(L-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="var(--muted)">'+fmtCourt(max*f)+'</text>'; });
+    values.forEach(function(v,i){
+      var h=ih*(v/max), x=L+step*i+(step-bw)/2, y=T+ih-h;
+      g+='<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+Math.max(h,0)+'" rx="3" fill="'+couleur+'"><title>'+esc(labels[i])+' : '+Math.round(v)+(suffixe||"")+'</title></rect>';
+      if(v>0) g+='<text x="'+(x+bw/2)+'" y="'+(y-3)+'" text-anchor="middle" font-size="9.5" fill="var(--muted)">'+fmtCourt(v)+'</text>';
+      g+='<text x="'+(L+step*i+step/2)+'" y="'+(H-8)+'" text-anchor="middle" font-size="9.5" fill="var(--muted)">'+esc(labels[i])+'</text>';
+    });
+    return '<svg viewBox="0 0 '+W+' '+H+'" role="img">'+g+'</svg>';
+  }
+  function comboChart(labels, bars, line){
+    var W=600,H=220,L=44,R=40,T=14,B=26, iw=W-L-R, ih=H-T-B;
+    var maxB=Math.max.apply(null,bars.concat([1]))*1.15, maxL=Math.max.apply(null,line.concat([1]))*1.25;
+    var bw=iw/bars.length*0.55, step=iw/bars.length, g="";
+    [0,0.5,1].forEach(function(f){ var y=T+ih-ih*f;
+      g+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="var(--border)" stroke-width="1"/>'+
+         '<text x="'+(L-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="var(--accent)">'+fmtCourt(maxB*f)+'</text>'+
+         '<text x="'+(W-R+6)+'" y="'+(y+4)+'" font-size="10" fill="#e08600">'+fmtCourt(maxL*f)+'</text>'; });
+    bars.forEach(function(v,i){ var h=ih*(v/maxB), x=L+step*i+(step-bw)/2;
+      g+='<rect x="'+x+'" y="'+(T+ih-h)+'" width="'+bw+'" height="'+Math.max(h,0)+'" rx="3" fill="var(--accent)" opacity=".85"><title>'+esc(labels[i])+' : '+Math.round(v)+' € HT</title></rect>';
+      g+='<text x="'+(L+step*i+step/2)+'" y="'+(H-8)+'" text-anchor="middle" font-size="9.5" fill="var(--muted)">'+esc(labels[i])+'</text>'; });
+    var pts=line.map(function(v,i){ return (L+step*i+step/2)+","+(T+ih-ih*(v/maxL)); });
+    g+='<polyline points="'+pts.join(" ")+'" fill="none" stroke="#e08600" stroke-width="2.5" stroke-linejoin="round"/>';
+    line.forEach(function(v,i){ var p=pts[i].split(","); g+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="3.5" fill="#e08600"><title>'+esc(labels[i])+' : '+v+' échange(s)</title></circle>'; });
+    return '<svg viewBox="0 0 '+W+' '+H+'" role="img">'+g+'</svg>';
+  }
+  function kpi(lbl,val,sub){ return '<div class="kpi"><div class="k-lbl">'+esc(lbl)+'</div><div class="k-val">'+val+'</div>'+(sub?'<div class="k-sub">'+sub+'</div>':'')+'</div>'; }
+  function statsHTML(d){
+    var st=statsClient(d);
+    if(!st.nbEch && !st.nbFac) return '<div class="empty" style="padding:12px">Ajoutez des factures et des échanges pour voir les statistiques.</div>';
+    var moy=moyenneParEchange();
+    var comp = (st.parEchange && moy) ? (st.parEchange>=moy
+        ? '<span style="color:var(--ok)">▲ '+Math.round((st.parEchange/moy-1)*100)+' % au-dessus de la moyenne</span>'
+        : '<span style="color:var(--danger)">▼ '+Math.round((1-st.parEchange/moy)*100)+' % sous la moyenne</span>') : "";
+    var labels=st.mois.map(labelMois);
+    return '<div class="kpi-grid">'+
+        kpi("CA total (HT)", fmtEuro(st.caTotal), st.nbFac+" facture"+(st.nbFac>1?"s":""))+
+        kpi("Échanges", String(st.nbEch), st.dernierEch?("dernier : "+fmtDate(st.dernierEch)):"")+
+        kpi("€ par échange", st.nbEch?fmtEuro(st.parEchange):"—", comp||"temps investi / CA")+
+        kpi("Facture moyenne", st.nbFac?fmtEuro(st.panier):"—", "moyenne tous clients : "+fmtEuro(moy)+"/échange")+
+      '</div>'+
+      '<div class="chart-card"><h4>Échanges par mois (12 derniers mois)</h4>'+barChart(labels, st.echMois, "#e08600")+'</div>'+
+      '<div class="chart-card"><h4>Chiffre d\'affaires par mois (HT)</h4>'+barChart(labels, st.caMois, "var(--accent)", " €")+'</div>'+
+      '<div class="chart-card"><h4>Comparaison : CA et échanges</h4>'+comboChart(labels, st.caMois, st.echMois)+
+        '<div class="legend"><span><i style="background:var(--accent)"></i>CA HT (axe gauche)</span><span><i style="background:#e08600"></i>Nombre d\'échanges (axe droit)</span></div></div>';
+  }
+
   // ---------- Supabase mapping ----------
   function mapToRow(d){
     return { type:d.type||"particulier", prenom:d.prenom||"", nom:d.nom||"", tel:d.tel||"", mail:d.mail||"",
       societe:d.societe||"", interlocuteurs:d.interlocuteurs||[], adresse:d.adresse||"", infos:d.infos||"",
-      factures:d.factures||[], echanges:d.echanges||[], actions:d.actions||[], suivi_par:d.suivi||"", created_at:d.createdAt||new Date().toISOString() };
+      factures:d.factures||[], echanges:d.echanges||[], actions:d.actions||[], suivi_par:d.suivi||"",
+      categorie:d.categorie||"", lat:(d.lat===""||d.lat==null)?null:Number(d.lat), lng:(d.lng===""||d.lng==null)?null:Number(d.lng), created_at:d.createdAt||new Date().toISOString() };
   }
   function mapFromRow(r){
     return { type:r.type||"particulier", prenom:r.prenom||"", nom:r.nom||"", tel:r.tel||"", mail:r.mail||"",
       societe:r.societe||"", interlocuteurs:r.interlocuteurs||[], adresse:r.adresse||"", infos:r.infos||"",
-      factures:r.factures||[], echanges:r.echanges||[], actions:r.actions||[], suivi:r.suivi_par||"", createdAt:r.created_at||new Date().toISOString() };
+      factures:r.factures||[], echanges:r.echanges||[], actions:r.actions||[], suivi:r.suivi_par||"",
+      categorie:r.categorie||"", lat:(r.lat==null?null:Number(r.lat)), lng:(r.lng==null?null:Number(r.lng)), createdAt:r.created_at||new Date().toISOString() };
   }
 
   async function persist(client){
@@ -1252,7 +1368,7 @@ window.crmDevisPDF = genererDevisPDF;
     var arr = clients.slice().sort(function(a,b){ return displayName(a.data).localeCompare(displayName(b.data),"fr"); });
     if(!q) return arr;
     return arr.filter(function(c){
-      var d=c.data, hay = displayName(d)+" "+(d.suivi||"")+" "+(d.mail||"")+" "+(d.tel||"")+" "+(d.societe||"");
+      var d=c.data, hay = displayName(d)+" "+(d.suivi||"")+" "+((cat(d.categorie)||{}).l||"")+" "+(d.mail||"")+" "+(d.tel||"")+" "+(d.societe||"");
       (d.interlocuteurs||[]).forEach(function(it){ hay += " "+(it.nom||"")+" "+(it.mail||""); });
       return hay.toLowerCase().indexOf(q)>=0;
     });
@@ -1290,6 +1406,7 @@ window.crmDevisPDF = genererDevisPDF;
       var col = couleurDe(d.suivi);
       var liStyle = col ? ' style="background:'+col.bg+';border-left:4px solid '+col.fg+'"' : '';
       if(d.suivi) sub += " · 👤 "+d.suivi;
+      if(cat(d.categorie)) sub = cat(d.categorie).l+" · "+sub;
       return '<li data-id="'+c.id+'" class="'+(c.id===selectedId?"active":"")+'"'+liStyle+'>'+
         '<div class="avatar" style="background:'+colorFor(c.id)+'">'+esc(initials(d))+'</div>'+
         '<div style="min-width:0">'+
@@ -1355,6 +1472,7 @@ window.crmDevisPDF = genererDevisPDF;
         '<div class="detail-title">'+
           '<h2>'+esc(displayName(d))+' <span class="tag '+(isPro(d)?"pro":"particulier")+'" style="vertical-align:middle;font-size:12px">'+(isPro(d)?"Pro":"Particulier")+'</span></h2>'+
           '<p>'+esc(isPro(d)?"Entreprise":"Particulier")+'</p>'+
+          (cat(d.categorie) ? '<span class="cat" style="background:'+cat(d.categorie).bg+';color:'+cat(d.categorie).fg+';margin-top:4px">'+esc(cat(d.categorie).l)+'</span> ' : '')+
           (d.suivi ? (function(){ var col=couleurDe(d.suivi)||PALETTE.gris; return '<span class="suivi-badge" style="background:'+col.bg+';color:'+col.fg+'">👤 Suivi par '+esc(d.suivi)+'</span>'; })() : '')+
         '</div>'+
         '<div class="head-actions">'+
@@ -1404,6 +1522,9 @@ window.crmDevisPDF = genererDevisPDF;
         '<button class="btn sm" id="fac_add">Ajouter la facture</button>'+
       '</div>'+
       '<ul class="line-list" id="facList">'+facturesHTML+'</ul>'+
+
+      '<div class="section-title">Statistiques du client</div>'+
+      statsHTML(d)+
 
       '<div class="section-title">Historique des échanges</div>'+
       '<div class="sub-add">'+
@@ -1525,9 +1646,42 @@ window.crmDevisPDF = genererDevisPDF;
           (u?'<span class="date-badge '+u+'">'+(u==="due"?"À faire":"Bientôt")+'</span>':'')+'</div>';
       }).join("");
     }
-    return '<div class="detail-head"><div class="detail-title"><h2>Actions à venir</h2><p>Toutes les actions planifiées, par ordre chronologique</p></div></div>'+list;
+    var avecGPS = clients.filter(function(c){ return c.data.lat!=null && c.data.lng!=null; }).length;
+    var carte = '<div class="section-title" style="margin-top:0">Carte des clients'+(avecGPS?' ('+avecGPS+')':'')+'</div>'+
+      (avecGPS ? '<div id="mapBox"></div>'
+               : '<div class="empty" style="padding:16px">Aucun client localisé. Ouvrez une fiche client → Modifier → « 📍 Depuis l\'adresse » pour l\'ajouter à la carte.</div>');
+    return '<div class="detail-head"><div class="detail-title"><h2>Actions à venir</h2><p>Toutes les actions planifiées, par ordre chronologique</p></div></div>'+
+      carte+'<div class="section-title">Prochaines actions</div>'+list;
+  }
+  var mapObj=null, mapLayer=null;
+  function dessinerCarte(){
+    var box=$("mapBox"); if(!box || !window.L) return;
+    var pts=clients.filter(function(c){ return c.data.lat!=null && c.data.lng!=null; });
+    if(!pts.length) return;
+    if(mapObj){ try{ mapObj.remove(); }catch(e){} mapObj=null; }
+    mapObj = L.map(box, {scrollWheelZoom:false});
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:"© OpenStreetMap"}).addTo(mapObj);
+    mapLayer = L.layerGroup().addTo(mapObj);
+    var bounds=[];
+    pts.forEach(function(c){
+      var col = couleurDe(c.data.suivi) || {fg:"#2b5ce6"};
+      var m = L.circleMarker([c.data.lat, c.data.lng], {radius:9, color:"#fff", weight:2, fillColor:col.fg, fillOpacity:.95}).addTo(mapLayer);
+      var ca = sumFacturesHT(c.data);
+      m.bindPopup('<strong>'+esc(displayName(c.data))+'</strong><br>'+
+        (c.data.suivi?'Suivi par '+esc(c.data.suivi)+'<br>':'')+
+        (ca?fmtEuro(ca)+' HT<br>':'')+
+        '<a href="#" data-openc="'+c.id+'">Ouvrir la fiche</a>');
+      bounds.push([c.data.lat, c.data.lng]);
+    });
+    mapObj.fitBounds(bounds, {padding:[30,30], maxZoom:13});
+    setTimeout(function(){ try{ mapObj.invalidateSize(); }catch(e){} }, 150);
+    mapObj.on("popupopen", function(e){
+      var a=e.popup.getElement().querySelector("[data-openc]");
+      if(a) a.addEventListener("click", function(ev){ ev.preventDefault(); selectedId=a.getAttribute("data-openc"); delete devisCache[selectedId]; render(); window.scrollTo(0,0); });
+    });
   }
   function bindAgenda(){
+    dessinerCarte();
     Array.prototype.forEach.call(document.querySelectorAll("[data-goto]"), function(el){
       el.addEventListener("click", function(){ selectedId = el.getAttribute("data-goto"); render(); });
     });
@@ -1650,6 +1804,39 @@ window.crmDevisPDF = genererDevisPDF;
     renderSwatches();
   }
 
+  function fillCategories(v){
+    $("f_categorie").innerHTML = '<option value="">— Non classé —</option>'+
+      CATEGORIES.map(function(c){ return '<option value="'+c.v+'">'+esc(c.l)+'</option>'; }).join("");
+    $("f_categorie").value = v||"";
+  }
+  function parseGPS(txt){
+    var t = String(txt||"").replace(/[()°]/g," ").trim();
+    var nums = t.match(/-?\d+(?:[.,]\d+)?/g) || [];
+    var la, ln;
+    if(nums.length===2){ la=nums[0]; ln=nums[1]; }
+    else if(nums.length===4){ la=nums[0]+"."+nums[1]; ln=nums[2]+"."+nums[3]; } // décimales écrites avec des virgules
+    else return null;
+    la=parseFloat(String(la).replace(",",".")); ln=parseFloat(String(ln).replace(",","."));
+    if(isNaN(la)||isNaN(ln)||Math.abs(la)>90||Math.abs(ln)>180) return null;
+    return {lat:Math.round(la*1e6)/1e6, lng:Math.round(ln*1e6)/1e6};
+  }
+  async function geocoder(){
+    var adr = ($("f_adresse").value||"").trim().replace(/\n/g," ");
+    if(!adr){ $("geoMsg").textContent = "Renseignez d'abord l'adresse."; return; }
+    $("btnGeo").disabled = true; $("geoMsg").textContent = "Recherche de l'adresse…";
+    try{
+      var r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+encodeURIComponent(adr), {headers:{"Accept":"application/json"}});
+      var j = await r.json();
+      if(j && j.length){
+        $("f_gps").value = (+j[0].lat).toFixed(6)+", "+(+j[0].lon).toFixed(6);
+        $("geoMsg").textContent = "✓ Trouvé : "+(j[0].display_name||"").slice(0,80);
+      } else {
+        $("geoMsg").textContent = "Adresse introuvable. Collez les coordonnées à la main (clic droit sur Google Maps → les chiffres en haut).";
+      }
+    }catch(e){ $("geoMsg").textContent = "Recherche indisponible : "+e.message; }
+    $("btnGeo").disabled = false;
+  }
+
   function openModal(id){
     editingId = id || null;
     $("modalTitle").textContent = id ? "Modifier le client" : "Nouveau client";
@@ -1657,6 +1844,9 @@ window.crmDevisPDF = genererDevisPDF;
     $("f_type").value = d.type||"particulier";
     $("f_prenom").value=d.prenom||""; $("f_nom").value=d.nom||""; $("f_tel").value=d.tel||""; $("f_mail").value=d.mail||"";
     $("f_societe").value=d.societe||""; $("f_adresse").value=d.adresse||""; $("f_infos").value=d.infos||"";
+    fillCategories(d.categorie||"");
+    $("f_gps").value = (d.lat!=null&&d.lng!=null) ? (d.lat+", "+d.lng) : "";
+    $("geoMsg").textContent = "Laissez vide si inutile. Vous pouvez aussi coller des coordonnées copiées depuis Google Maps.";
     editInterlocs = (d.interlocuteurs||[]).map(function(x){ return Object.assign({}, x); });
     renderInterlocs(); toggleTypeFields(); fillSuiviSelect(d.suivi||"");
     $("modalBg").classList.add("open");
@@ -1677,6 +1867,10 @@ window.crmDevisPDF = genererDevisPDF;
     d.societe=$("f_societe").value.trim();
     d.interlocuteurs = type==="pro" ? editInterlocs.filter(function(it){ return (it.nom||it.mail||it.tel||it.poste); }).map(function(it){ return { id:it.id||shortId(), nom:it.nom||"", poste:it.poste||"", tel:it.tel||"", mail:it.mail||"" }; }) : (d.interlocuteurs||[]);
     d.adresse=$("f_adresse").value.trim(); d.infos=$("f_infos").value.trim();
+    d.categorie=$("f_categorie").value;
+    var gpsTxt=($("f_gps").value||"").trim();
+    if(!gpsTxt){ d.lat=null; d.lng=null; }
+    else { var g=parseGPS(gpsTxt); if(!g){ toast("Point GPS invalide (ex : 45.0412, 4.8123)"); return; } d.lat=g.lat; d.lng=g.lng; }
     var sv = $("f_suivi").value;
     if(sv==="__new__"){ sv = ($("f_newPerson").value||"").trim(); if(!sv){ toast("Saisissez le prénom de la personne"); return; } }
     if(sv){ try{ await saveMembre(sv, pickedColor); }catch(e){ console.error(e); toast("Couleur non enregistrée (script SQL exécuté ?)"); } }
@@ -1735,6 +1929,7 @@ window.crmDevisPDF = genererDevisPDF;
   $("modalBg").addEventListener("click", function(e){ if(e.target===$("modalBg")) closeModal(); });
   $("f_type").addEventListener("change", toggleTypeFields);
   $("f_suivi").addEventListener("change", onSuiviChange);
+  $("btnGeo").addEventListener("click", geocoder);
   document.addEventListener("click", function(e){
     var b = e.target.closest ? e.target.closest("[data-devis]") : null;
     if(b){ e.preventDefault(); ouvrirDevis(b.getAttribute("data-devis")); }
