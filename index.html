@@ -344,6 +344,38 @@
   </div>
 </div>
 
+<!-- Modification d'une facture -->
+<div class="modal-bg" id="facModalBg">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-h">
+      <h3>Modifier la facture</h3>
+      <button class="x" id="facClose">✕</button>
+    </div>
+    <div class="modal-b">
+      <div class="field"><label>Libellé</label><input id="ef_label" type="text"></div>
+      <div class="row2">
+        <div class="field"><label>Date</label><input id="ef_date" type="date"></div>
+        <div class="field"><label>&nbsp;</label>
+          <div style="display:flex;gap:8px">
+            <input id="ef_ht" type="text" placeholder="Montant HT">
+            <input id="ef_ttc" type="text" placeholder="TTC (auto 20%)">
+          </div>
+        </div>
+      </div>
+      <div class="field"><label>Note</label><textarea id="ef_note"></textarea></div>
+      <div class="field"><label>Fichier joint</label>
+        <div id="ef_fileNow" style="font-size:13px;margin-bottom:6px"></div>
+        <input id="ef_file" type="file">
+        <div style="font-size:12px;color:var(--muted);margin-top:6px">Choisir un fichier remplace celui déjà joint.</div>
+      </div>
+    </div>
+    <div class="modal-f">
+      <button class="btn ghost" id="facCancel">Annuler</button>
+      <button class="btn" id="facSave">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 
@@ -1436,7 +1468,8 @@ window.crmDevisPDF = genererDevisPDF;
       return '<li data-fid="'+f.id+'">'+
         '<div class="li-main"><div class="li-t">'+esc(f.label||"Facture")+'</div>'+
         '<div class="li-s">'+esc(f.date?fmtDate(f.date):"Sans date")+'</div>'+ fileLink + note +'</div>'+
-        amt + '<button class="x" data-del-fac="'+f.id+'">✕</button></li>';
+        amt + '<div style="display:flex;flex-direction:column;gap:2px"><button class="x" data-edit-fac="'+f.id+'" title="Modifier">✏️</button>'+
+        '<button class="x" data-del-fac="'+f.id+'" title="Supprimer">✕</button></div></li>';
     }).join("") || '<div class="empty" style="padding:12px">Aucune facture.</div>';
 
     var actions = (d.actions||[]).slice().sort(function(a,b){ if(a.done!==b.done) return a.done?1:-1; return actKey(a).localeCompare(actKey(b)); });
@@ -1662,16 +1695,55 @@ window.crmDevisPDF = genererDevisPDF;
     }
     var avecGPS = clients.filter(function(c){ return c.data.lat!=null && c.data.lng!=null; }).length;
     var carte = '<div class="section-title" style="margin-top:0">Carte des clients'+(avecGPS?' ('+avecGPS+')':'')+'</div>'+
-      (avecGPS ? '<div id="mapBox"></div>'
+      (avecGPS ? filtresCarteHTML()+'<div id="mapBox"></div>'
                : '<div class="empty" style="padding:16px">Aucun client localisé. Ouvrez une fiche client → Modifier → « 📍 Depuis l\'adresse » pour l\'ajouter à la carte.</div>');
     return '<div class="detail-head"><div class="detail-title"><h2>Actions à venir</h2><p>Toutes les actions planifiées, par ordre chronologique</p></div></div>'+
       carte+'<div class="section-title">Prochaines actions</div>'+list;
   }
   var mapObj=null, mapLayer=null;
+  var mapFiltreCat="", mapFiltreSuivi="";
+  function clientsCarte(){
+    return clients.filter(function(c){
+      var d=c.data;
+      if(d.lat==null||d.lng==null) return false;
+      if(mapFiltreCat==="__aucune__"){ if(cat(d.categorie)) return false; }
+      else if(mapFiltreCat && (d.categorie||"")!==mapFiltreCat) return false;
+      if(mapFiltreSuivi){ var m=membre(d.suivi); if(!m||m.nom!==mapFiltreSuivi) return false; }
+      return true;
+    });
+  }
+  function filtresCarteHTML(){
+    var loc = clients.filter(function(c){ return c.data.lat!=null&&c.data.lng!=null; });
+    var cats = CATEGORIES.filter(function(k){ return loc.some(function(c){ return c.data.categorie===k.v; }); });
+    var sansCat = loc.some(function(c){ return !cat(c.data.categorie); });
+    var membres = equipe.filter(function(m){ return loc.some(function(c){ return membre(c.data.suivi)===m; }); });
+    var h = '<div class="team-bar">'+
+      '<span class="team-chip'+(mapFiltreCat===""?" on":"")+'" data-mc="">Toutes catégories</span>'+
+      cats.map(function(k){
+        var n=loc.filter(function(c){ return c.data.categorie===k.v; }).length;
+        return '<span class="team-chip'+(mapFiltreCat===k.v?" on":"")+'" data-mc="'+k.v+'" style="background:'+k.bg+';color:'+k.fg+'">'+esc(k.l)+' ('+n+')</span>';
+      }).join("")+
+      (sansCat?'<span class="team-chip'+(mapFiltreCat==="__aucune__"?" on":"")+'" data-mc="__aucune__">Non classés ('+loc.filter(function(c){ return !cat(c.data.categorie); }).length+')</span>':'')+
+      '</div>';
+    if(membres.length){
+      h += '<div class="team-bar">'+
+        '<span class="team-chip'+(mapFiltreSuivi===""?" on":"")+'" data-ms="">Tous les interlocuteurs</span>'+
+        membres.map(function(m){
+          var col=PALETTE[m.couleur]||PALETTE.bleu;
+          var n=loc.filter(function(c){ return membre(c.data.suivi)===m; }).length;
+          return '<span class="team-chip'+(mapFiltreSuivi===m.nom?" on":"")+'" data-ms="'+esc(m.nom)+'" style="background:'+col.bg+'"><span class="cdot" style="background:'+col.fg+'"></span>'+esc(m.nom)+' ('+n+')</span>';
+        }).join("")+'</div>';
+    }
+    return h;
+  }
   function dessinerCarte(){
     var box=$("mapBox"); if(!box || !window.L) return;
-    var pts=clients.filter(function(c){ return c.data.lat!=null && c.data.lng!=null; });
-    if(!pts.length) return;
+    var pts=clientsCarte();
+    if(!pts.length){
+      box.innerHTML = '<div class="empty" style="padding:24px">Aucun client localisé pour ce filtre.</div>';
+      if(mapObj){ try{ mapObj.remove(); }catch(e){} mapObj=null; }
+      return;
+    }
     if(mapObj){ try{ mapObj.remove(); }catch(e){} mapObj=null; }
     mapObj = L.map(box, {scrollWheelZoom:false});
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:"© OpenStreetMap"}).addTo(mapObj);
@@ -1696,6 +1768,12 @@ window.crmDevisPDF = genererDevisPDF;
   }
   function bindAgenda(){
     dessinerCarte();
+    Array.prototype.forEach.call(document.querySelectorAll("[data-mc]"), function(el){
+      el.addEventListener("click", function(){ mapFiltreCat = el.getAttribute("data-mc"); render(); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-ms]"), function(el){
+      el.addEventListener("click", function(){ mapFiltreSuivi = el.getAttribute("data-ms"); render(); });
+    });
     Array.prototype.forEach.call(document.querySelectorAll("[data-goto]"), function(el){
       el.addEventListener("click", function(){ selectedId = el.getAttribute("data-goto"); render(); });
     });
@@ -1758,9 +1836,53 @@ window.crmDevisPDF = genererDevisPDF;
       });
     });
     delegateDelete("data-del-act", function(id){ d.actions=(d.actions||[]).filter(function(x){return x.id!==id;}); persist(c).then(render); });
+    delegateDelete("data-edit-fac", function(id){
+      var f=(d.factures||[]).filter(function(x){ return x.id===id; })[0];
+      if(f) openFacModal(c, f);
+    });
     delegateDelete("data-del-fac", function(id){ d.factures=(d.factures||[]).filter(function(x){return x.id!==id;}); persist(c).then(render); });
     delegateDelete("data-del-ech", function(id){ d.echanges=(d.echanges||[]).filter(function(x){return x.id!==id;}); persist(c).then(render); });
   }
+  // ---------- Modifier une facture ----------
+  var facEdit = null; // {client, facture}
+  function openFacModal(c, f){
+    facEdit = { c:c, f:f };
+    $("ef_label").value=f.label||""; $("ef_date").value=f.date||"";
+    $("ef_ht").value=f.ht||""; $("ef_ttc").value=f.ttc||""; $("ef_note").value=f.note||"";
+    $("ef_file").value="";
+    $("ef_fileNow").innerHTML = (f.file&&f.file.url)
+      ? '📎 <a href="'+esc(f.file.url)+'" target="_blank" rel="noopener" style="color:var(--accent)">'+esc(f.file.name||"fichier")+'</a> <button class="btn danger sm" id="ef_rmFile" style="margin-left:8px">Retirer</button>'
+      : '<span style="color:var(--muted)">Aucun fichier joint</span>';
+    if($("ef_rmFile")) $("ef_rmFile").addEventListener("click", function(){
+      facEdit.f._removeFile = true;
+      $("ef_fileNow").innerHTML = '<span style="color:var(--muted)">Fichier retiré (enregistrez pour confirmer)</span>';
+    });
+    $("facModalBg").classList.add("open");
+  }
+  function closeFacModal(){ $("facModalBg").classList.remove("open"); facEdit=null; }
+  async function saveFacModal(){
+    if(!facEdit) return;
+    var c=facEdit.c, f=facEdit.f, btn=$("facSave");
+    var label=($("ef_label").value||"").trim();
+    if(!label){ toast("Saisissez un libellé"); return; }
+    btn.disabled=true;
+    var fileEl=$("ef_file");
+    try{ if(fileEl.files && fileEl.files[0]){ toast("Envoi du fichier…"); f.file = await uploadFactureFile(fileEl.files[0]); } }
+    catch(err){ console.error(err); toast("Fichier non envoyé (autres modifications conservées)"); }
+    if(f._removeFile && !(fileEl.files && fileEl.files[0])) f.file = null;
+    delete f._removeFile;
+    f.label=label; f.date=$("ef_date").value||"";
+    f.ht=($("ef_ht").value||"").trim(); f.ttc=($("ef_ttc").value||"").trim();
+    f.note=($("ef_note").value||"").trim();
+    await persist(c); btn.disabled=false; closeFacModal(); render(); toast("Facture modifiée");
+  }
+  function bindFacAutoCalc(){
+    var ht=$("ef_ht"), ttc=$("ef_ttc"), lock=false;
+    function money(n){ return (Math.round(n*100)/100).toString().replace(".",","); }
+    ht.addEventListener("input", function(){ if(lock) return; lock=true; ttc.value = ht.value.trim()===""?"":money(ttcFromHt(parseAmount(ht.value))); lock=false; });
+    ttc.addEventListener("input", function(){ if(lock) return; lock=true; ht.value = ttc.value.trim()===""?"":money(htFromTtc(parseAmount(ttc.value))); lock=false; });
+  }
+
   function delegateDelete(attr, fn){
     Array.prototype.forEach.call(document.querySelectorAll("["+attr+"]"), function(el){
       el.addEventListener("click", function(){ fn(el.getAttribute(attr)); });
@@ -1944,13 +2066,18 @@ window.crmDevisPDF = genererDevisPDF;
   $("f_type").addEventListener("change", toggleTypeFields);
   $("f_suivi").addEventListener("change", onSuiviChange);
   $("btnGeo").addEventListener("click", geocoder);
+  $("facClose").addEventListener("click", closeFacModal);
+  $("facCancel").addEventListener("click", closeFacModal);
+  $("facSave").addEventListener("click", saveFacModal);
+  $("facModalBg").addEventListener("click", function(e){ if(e.target===$("facModalBg")) closeFacModal(); });
+  bindFacAutoCalc();
   document.addEventListener("click", function(e){
     var b = e.target.closest ? e.target.closest("[data-devis]") : null;
     if(b){ e.preventDefault(); ouvrirDevis(b.getAttribute("data-devis")); }
   });
   $("addInterloc").addEventListener("click", function(){ editInterlocs.push({ id:shortId(), nom:"", poste:"", tel:"", mail:"" }); renderInterlocs(); });
   $("searchInput").addEventListener("input", renderList);
-  document.addEventListener("keydown", function(e){ if(e.key==="Escape" && $("modalBg").classList.contains("open")) closeModal(); });
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape"){ if($("modalBg").classList.contains("open")) closeModal(); if($("facModalBg").classList.contains("open")) closeFacModal(); } });
 
   $("auth_submit").addEventListener("click", doAuth);
   $("auth_pass").addEventListener("keydown", function(e){ if(e.key==="Enter") doAuth(); });
