@@ -186,6 +186,14 @@
   .chart-card svg { width: 100%; height: auto; display: block; }
   .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
   .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 4px 0 18px; }
+  @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; gap: 6px; } }
+  .col-box { min-width: 0; }
+  .col-box .sub-add { flex-wrap: wrap; }
+  .scroll-box { max-height: 320px; overflow-y: auto; }
+  .iti-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-top: 8px; background: var(--bg); }
+  .iti-bar .iti-list { flex: 1; min-width: 160px; font-size: 12.5px; color: var(--muted); }
+  .iti-bar .iti-list strong { color: var(--text); }
   .sec-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; user-select: none; padding: 6px 0; border-radius: 6px; }
   .sec-toggle:hover { color: var(--accent); }
   .sec-hint { font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
@@ -1518,6 +1526,28 @@ window.crmDevisPDF = genererDevisPDF;
         '</div>'+
       '</div>'+
 
+      '<div class="two-col">'+
+        '<div class="col-box">'+
+          '<div class="section-title" style="margin-top:0">Prochaines actions</div>'+
+          '<div class="sub-add">'+
+            '<input type="text" id="act_label" placeholder="Action à faire (ex : rappeler pour devis)">'+
+            '<input type="date" id="act_date" class="date">'+
+            '<input type="time" id="act_time" class="time" title="Heure (facultatif)">'+
+            '<button class="btn sm" id="act_add">Ajouter</button>'+
+          '</div>'+
+          '<ul class="line-list" id="actList">'+actionsHTML+'</ul>'+
+        '</div>'+
+        '<div class="col-box">'+
+          '<div class="section-title" style="margin-top:0">Historique des échanges</div>'+
+          '<div class="sub-add">'+
+            '<input type="date" id="ech_date" class="date">'+
+            '<textarea id="ech_text" placeholder="Contenu de l\'échange (appel, email, rendez-vous…)"></textarea>'+
+            '<button class="btn sm" id="ech_add">Consigner</button>'+
+          '</div>'+
+          '<div id="echList" class="scroll-box">'+echangesHTML+'</div>'+
+        '</div>'+
+      '</div>'+
+
       '<div class="info-grid">'+
         (isPro(d) ? '' : infoItem("Téléphone", d.tel ? '<a href="tel:'+esc(d.tel)+'">'+esc(d.tel)+'</a>' : '<span class="muted">—</span>'))+
         (isPro(d) ? '' : infoItem("Email", d.mail ? '<a href="mailto:'+esc(d.mail)+'">'+esc(d.mail)+'</a>' : '<span class="muted">—</span>'))+
@@ -1529,15 +1559,6 @@ window.crmDevisPDF = genererDevisPDF;
       interlocHTML +
       '<div class="section-title" style="display:flex;justify-content:space-between;align-items:center">Devis en cours (Cubeur)<button class="btn ghost sm" id="devisRefresh" style="text-transform:none;letter-spacing:0">↻ Actualiser</button></div>'+
       '<div id="devisBox">'+devisHTML(c.id)+'</div>'+
-
-      '<div class="section-title">Prochaines actions</div>'+
-      '<div class="sub-add">'+
-        '<input type="text" id="act_label" placeholder="Action à faire (ex : rappeler pour devis)">'+
-        '<input type="date" id="act_date" class="date">'+
-        '<input type="time" id="act_time" class="time" title="Heure (facultatif)">'+
-        '<button class="btn sm" id="act_add">Ajouter</button>'+
-      '</div>'+
-      '<ul class="line-list" id="actList">'+actionsHTML+'</ul>'+
 
       '<div class="section-title">Factures</div>'+
       '<div class="totals-row">'+
@@ -1565,13 +1586,7 @@ window.crmDevisPDF = genererDevisPDF;
       '</div>'+
       '<div id="statsBox"'+(statsOpen?'':' class="hidden"')+'>'+(statsOpen?statsHTML(d):'')+'</div>'+
 
-      '<div class="section-title">Historique des échanges</div>'+
-      '<div class="sub-add">'+
-        '<input type="date" id="ech_date" class="date">'+
-        '<textarea id="ech_text" placeholder="Contenu de l\'échange (appel, email, rendez-vous…)"></textarea>'+
-        '<button class="btn sm" id="ech_add">Consigner</button>'+
-      '</div>'+
-      '<div id="echList">'+echangesHTML+'</div>';
+      '';
 
     bindDetail(c);
     $("statsToggle").addEventListener("click", function(){
@@ -1695,12 +1710,60 @@ window.crmDevisPDF = genererDevisPDF;
     }
     var avecGPS = clients.filter(function(c){ return c.data.lat!=null && c.data.lng!=null; }).length;
     var carte = '<div class="section-title" style="margin-top:0">Carte des clients'+(avecGPS?' ('+avecGPS+')':'')+'</div>'+
-      (avecGPS ? filtresCarteHTML()+'<div id="mapBox"></div>'
+      (avecGPS ? filtresCarteHTML()+'<div id="mapBox"></div>'+itiBarHTML()
                : '<div class="empty" style="padding:16px">Aucun client localisé. Ouvrez une fiche client → Modifier → « 📍 Depuis l\'adresse » pour l\'ajouter à la carte.</div>');
     return '<div class="detail-head"><div class="detail-title"><h2>Actions à venir</h2><p>Toutes les actions planifiées, par ordre chronologique</p></div></div>'+
-      carte+'<div class="section-title">Prochaines actions</div>'+list;
+      '<div class="section-title" style="margin-top:0">Prochaines actions</div>'+list+carte;
   }
-  var mapObj=null, mapLayer=null;
+  var mapObj=null, mapLayer=null, mapMarkers={};
+  var itiSel = [];          // ids des clients retenus pour l'itinéraire, dans l'ordre
+  var itiDepart = true;     // partir de ma position
+  function itiBarHTML(){
+    var noms = itiSel.map(function(id){ var c=getClient(id); return c?displayName(c.data):""; }).filter(Boolean);
+    return '<div class="iti-bar">'+
+      '<span class="iti-list">'+(noms.length
+        ? '<strong>Itinéraire ('+noms.length+') :</strong> '+esc(noms.join(" → "))
+        : 'Cliquez sur un point puis « Ajouter à l\'itinéraire » pour préparer une tournée.')+'</span>'+
+      '<label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer">'+
+        '<input type="checkbox" id="itiDepart" '+(itiDepart?"checked":"")+' style="width:16px;height:16px;accent-color:var(--accent)"> Partir de ma position</label>'+
+      '<button class="btn sm" id="itiGo"'+(noms.length?'':' disabled')+'>🗺 Ouvrir dans Maps</button>'+
+      (noms.length?'<button class="btn ghost sm" id="itiClear">Vider</button>':'')+
+      '</div>';
+  }
+  function majIti(){
+    var bar=document.querySelector(".iti-bar");
+    if(bar){ bar.outerHTML = itiBarHTML(); bindIti(); }
+    Object.keys(mapMarkers).forEach(function(id){
+      var m=mapMarkers[id], choisi=itiSel.indexOf(id)>=0;
+      try{ m.setStyle({ weight: choisi?4:2, color: choisi?"#111827":"#fff", radius: choisi?11:9 }); }catch(e){}
+    });
+  }
+  function toggleIti(id){
+    var i=itiSel.indexOf(id);
+    if(i>=0) itiSel.splice(i,1); else itiSel.push(id);
+    majIti();
+    if(mapObj && mapMarkers[id]) mapMarkers[id].closePopup();
+  }
+  function ouvrirMaps(){
+    var pts=itiSel.map(function(id){ var c=getClient(id); return c?(c.data.lat+","+c.data.lng):null; }).filter(Boolean);
+    if(!pts.length) return;
+    var url="https://www.google.com/maps/dir/?api=1&travelmode=driving";
+    var etapes=pts.slice();
+    if(!itiDepart){ url += "&origin="+encodeURIComponent(etapes.shift()); }
+    if(!etapes.length){ toast("Ajoutez au moins une autre étape"); return; }
+    var dest=etapes.pop();
+    url += "&destination="+encodeURIComponent(dest);
+    if(etapes.length){
+      if(etapes.length>9){ toast("Maps accepte 9 étapes intermédiaires : les suivantes sont ignorées"); etapes=etapes.slice(0,9); }
+      url += "&waypoints="+encodeURIComponent(etapes.join("|"));
+    }
+    window.open(url, "_blank");
+  }
+  function bindIti(){
+    var cb=$("itiDepart"); if(cb) cb.addEventListener("change", function(){ itiDepart=cb.checked; });
+    var go=$("itiGo"); if(go) go.addEventListener("click", ouvrirMaps);
+    var cl=$("itiClear"); if(cl) cl.addEventListener("click", function(){ itiSel=[]; majIti(); });
+  }
   var mapFiltreCat="", mapFiltreSuivi="";
   function clientsCarte(){
     return clients.filter(function(c){
@@ -1738,6 +1801,7 @@ window.crmDevisPDF = genererDevisPDF;
   }
   function dessinerCarte(){
     var box=$("mapBox"); if(!box || !window.L) return;
+    mapMarkers={};
     var pts=clientsCarte();
     if(!pts.length){
       box.innerHTML = '<div class="empty" style="padding:24px">Aucun client localisé pour ce filtre.</div>';
@@ -1751,23 +1815,30 @@ window.crmDevisPDF = genererDevisPDF;
     var bounds=[];
     pts.forEach(function(c){
       var col = couleurDe(c.data.suivi) || {fg:"#2b5ce6"};
-      var m = L.circleMarker([c.data.lat, c.data.lng], {radius:9, color:"#fff", weight:2, fillColor:col.fg, fillOpacity:.95}).addTo(mapLayer);
+      var choisi = itiSel.indexOf(c.id)>=0;
+      var m = L.circleMarker([c.data.lat, c.data.lng], {radius:choisi?11:9, color:choisi?"#111827":"#fff", weight:choisi?4:2, fillColor:col.fg, fillOpacity:.95}).addTo(mapLayer);
+      mapMarkers[c.id] = m;
       var ca = sumFacturesHT(c.data);
       m.bindPopup('<strong>'+esc(displayName(c.data))+'</strong><br>'+
         (c.data.suivi?'Suivi par '+esc(c.data.suivi)+'<br>':'')+
         (ca?fmtEuro(ca)+' HT<br>':'')+
-        '<a href="#" data-openc="'+c.id+'">Ouvrir la fiche</a>');
+        '<a href="#" data-openc="'+c.id+'">Ouvrir la fiche</a><br>'+
+        '<a href="#" data-iti="'+c.id+'">'+(itiSel.indexOf(c.id)>=0?"➖ Retirer de l\'itinéraire":"➕ Ajouter à l\'itinéraire")+'</a>');
       bounds.push([c.data.lat, c.data.lng]);
     });
     mapObj.fitBounds(bounds, {padding:[30,30], maxZoom:13});
     setTimeout(function(){ try{ mapObj.invalidateSize(); }catch(e){} }, 150);
     mapObj.on("popupopen", function(e){
-      var a=e.popup.getElement().querySelector("[data-openc]");
+      var el=e.popup.getElement();
+      var a=el.querySelector("[data-openc]");
       if(a) a.addEventListener("click", function(ev){ ev.preventDefault(); selectedId=a.getAttribute("data-openc"); delete devisCache[selectedId]; render(); window.scrollTo(0,0); });
+      var b=el.querySelector("[data-iti]");
+      if(b) b.addEventListener("click", function(ev){ ev.preventDefault(); toggleIti(b.getAttribute("data-iti")); });
     });
   }
   function bindAgenda(){
     dessinerCarte();
+    bindIti();
     Array.prototype.forEach.call(document.querySelectorAll("[data-mc]"), function(el){
       el.addEventListener("click", function(){ mapFiltreCat = el.getAttribute("data-mc"); render(); });
     });
