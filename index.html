@@ -1649,7 +1649,7 @@ window.crmDevisPDF = genererDevisPDF;
   function commandeVersDevis(k){
     return {
       client:k.client||"", chantier:k.chantier||"", dateLivraison:k.date_livraison||"", notes:k.notes||"",
-      adresseClient:k.adresse_client||"", adresseLivraison:k.adresse_livraison||"", remise:k.remise||"",
+      telClient:k.tel_client||"", adresseClient:k.adresse_client||"", adresseLivraison:k.adresse_livraison||"", remise:k.remise||"",
       livraisonType:k.livraison_type||"", livraisonVal:k.livraison_val||"",
       lignes:(k.lignes||[]).map(function(l){ return Object.assign({}, l, {
         longueur:cmdNum(l.longueur), quantite:cmdNum(l.quantite),
