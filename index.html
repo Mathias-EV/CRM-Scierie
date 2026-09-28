@@ -191,6 +191,8 @@
   .tabs button.on { background: var(--panel); color: var(--text); box-shadow: var(--shadow); }
   .pane.hidden { display: none; }
   .sel-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 9px 11px; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 9px; margin-bottom: 10px; font-size: 13px; font-weight: 600; color: var(--accent); }
+  .agenda-link { text-decoration: none; font-size: 15px; line-height: 1; display: inline-flex; align-items: center; }
+  .agenda-link:hover { background: var(--accent-soft); }
   .cl-check { width: 17px; height: 17px; accent-color: var(--accent); flex: none; cursor: pointer; }
   .tarif-line { display: flex; align-items: center; gap: 10px; padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--bg); }
   .tarif-line .t-ess { font-weight: 600; flex: 1; }
@@ -1306,6 +1308,43 @@ window.crmDevisPDF = genererDevisPDF;
   ];
   function cat(v){ for(var i=0;i<CATEGORIES.length;i++) if(CATEGORIES[i].v===v) return CATEGORIES[i]; return null; }
 
+  // ---------- Ajout d'une action à Google Agenda ----------
+  function gDate(dt){ // Date -> 20260405T140000Z
+    return dt.getUTCFullYear()+
+      String(dt.getUTCMonth()+1).padStart(2,"0")+
+      String(dt.getUTCDate()).padStart(2,"0")+"T"+
+      String(dt.getUTCHours()).padStart(2,"0")+
+      String(dt.getUTCMinutes()).padStart(2,"0")+"00Z";
+  }
+  function gDay(dt){ return dt.getFullYear()+String(dt.getMonth()+1).padStart(2,"0")+String(dt.getDate()).padStart(2,"0"); }
+  function urlAgenda(a, d){
+    if(!a.date) return "";
+    var titre = a.label + " — " + displayName(d);
+    var dates;
+    if(a.time){
+      var hm = a.time.split(":");
+      var deb = new Date(a.date+"T00:00:00"); deb.setHours(+hm[0], +hm[1]||0, 0, 0);
+      var fin = new Date(deb.getTime() + 60*60*1000);   // 1 h par défaut
+      dates = gDate(deb)+"/"+gDate(fin);
+    } else {
+      var j = new Date(a.date+"T00:00:00");
+      var j2 = new Date(j.getTime() + 24*60*60*1000);   // journée entière
+      dates = gDay(j)+"/"+gDay(j2);
+    }
+    var details = [];
+    if(d.numero) details.push("Client "+d.numero);
+    if(d.tel) details.push("Tél. "+d.tel);
+    if(d.mail) details.push(d.mail);
+    (d.interlocuteurs||[]).forEach(function(it){
+      if(it.nom) details.push(it.nom+(it.poste?" ("+it.poste+")":"")+(it.tel?" — "+it.tel:""));
+    });
+    return "https://calendar.google.com/calendar/render?action=TEMPLATE"+
+      "&text="+encodeURIComponent(titre)+
+      "&dates="+dates+
+      "&details="+encodeURIComponent(details.join("\n"))+
+      "&location="+encodeURIComponent(adresseTexte(d).replace(/\n/g,", "));  // heures envoyées en UTC (suffixe Z)
+  }
+
   // ---------- Adresse (libre ou par champs) ----------
   function adresseTexte(d){
     if((d.adrMode||"libre")==="champs"){
@@ -1579,6 +1618,7 @@ window.crmDevisPDF = genererDevisPDF;
       return '<li class="'+(a.done?"task-done":"")+'" data-aid="'+a.id+'">'+
         '<input type="checkbox" class="chk" data-toggle="'+a.id+'" '+(a.done?"checked":"")+'>'+
         '<div class="li-main"><div class="li-t">'+esc(a.label)+'</div></div>'+ badge +
+        (a.date && !a.done ? '<a class="x agenda-link" href="'+urlAgenda(a,d)+'" target="_blank" rel="noopener" title="Ajouter à Google Agenda">📅</a>' : '')+
         '<button class="x" data-del-act="'+a.id+'">✕</button></li>';
     }).join("") || '<div class="empty" style="padding:12px">Aucune action prévue.</div>';
 
@@ -1811,7 +1851,7 @@ window.crmDevisPDF = genererDevisPDF;
   function renderAgenda(){
     var items = [];
     clients.forEach(function(c){
-      (c.data.actions||[]).forEach(function(a){ if(!a.done && a.date) items.push({ clientId:c.id, clientName:displayName(c.data), label:a.label, date:a.date, time:a.time||"" }); });
+      (c.data.actions||[]).forEach(function(a){ if(!a.done && a.date) items.push({ clientId:c.id, clientName:displayName(c.data), label:a.label, date:a.date, time:a.time||"", url:urlAgenda(a, c.data) }); });
     });
     items.sort(function(a,b){ return actKey(a).localeCompare(actKey(b)); });
     var list;
@@ -1823,7 +1863,9 @@ window.crmDevisPDF = genererDevisPDF;
         return '<div class="agenda-item" data-goto="'+it.clientId+'">'+
           '<div class="agenda-when"><div class="d" style="'+(u==="due"?"color:var(--danger)":u==="soon"?"color:var(--warn)":"")+'">'+dayNum(it.date)+'</div><div class="m">'+esc(monthShort(it.date))+'</div>'+(it.time?'<div class="h">'+esc(it.time.replace(":","h"))+'</div>':'')+'</div>'+
           '<div class="agenda-main"><div class="at">'+esc(it.label)+'</div><div class="ac">'+esc(it.clientName)+' · '+esc(fmtWhen(it.date,it.time))+'</div></div>'+
-          (u?'<span class="date-badge '+u+'">'+(u==="due"?"À faire":"Bientôt")+'</span>':'')+'</div>';
+          (u?'<span class="date-badge '+u+'">'+(u==="due"?"À faire":"Bientôt")+'</span>':'')+
+          '<a class="x agenda-link" href="'+it.url+'" target="_blank" rel="noopener" title="Ajouter à Google Agenda">📅</a>'+
+          '</div>';
       }).join("");
     }
     var avecGPS = clients.filter(function(c){ return c.data.lat!=null && c.data.lng!=null; }).length;
@@ -1979,7 +2021,10 @@ window.crmDevisPDF = genererDevisPDF;
     });
     if($("mapCp")) $("mapCp").addEventListener("change", function(){ mapFiltreCp = $("mapCp").value; render(); });
     Array.prototype.forEach.call(document.querySelectorAll("[data-goto]"), function(el){
-      el.addEventListener("click", function(){ selectedId = el.getAttribute("data-goto"); render(); });
+      el.addEventListener("click", function(ev){
+        if(ev.target.closest && ev.target.closest(".agenda-link")) return; // laisser le lien agenda s'ouvrir
+        selectedId = el.getAttribute("data-goto"); render();
+      });
     });
   }
 
