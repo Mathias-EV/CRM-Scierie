@@ -186,6 +186,16 @@
   .chart-card svg { width: 100%; height: auto; display: block; }
   .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
   .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+  .tabs { display: flex; gap: 4px; padding: 4px; background: var(--bg); border-radius: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tabs button { flex: 1; min-width: 110px; padding: 8px 10px; border: none; background: transparent; color: var(--muted); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; }
+  .tabs button.on { background: var(--panel); color: var(--text); box-shadow: var(--shadow); }
+  .pane.hidden { display: none; }
+  .sel-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 9px 11px; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 9px; margin-bottom: 10px; font-size: 13px; font-weight: 600; color: var(--accent); }
+  .cl-check { width: 17px; height: 17px; accent-color: var(--accent); flex: none; cursor: pointer; }
+  .tarif-line { display: flex; align-items: center; gap: 10px; padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--bg); }
+  .tarif-line .t-ess { font-weight: 600; flex: 1; }
+  .tarif-line .t-prix { font-weight: 700; color: var(--accent); }
+  .num-cli { font-size: 12px; color: var(--muted); font-weight: 600; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 4px 0 18px; }
   @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; gap: 6px; } }
   .col-box { min-width: 0; }
@@ -274,6 +284,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             <input type="text" id="searchInput" placeholder="Rechercher un client…">
           </div>
+          <div class="sel-bar hidden" id="selBar"></div>
           <div class="team-bar" id="teamBar"></div>
           <ul class="clist" id="clientList"></ul>
         </div>
@@ -332,16 +343,43 @@
         </div>
       </div>
 
-      <div class="field"><label>Catégorie du client</label>
-        <select id="f_categorie"></select>
+      <div class="row2">
+        <div class="field"><label>N° client</label><input id="f_numero" type="text" placeholder="Auto : CLI-0001"></div>
+        <div class="field"><label>Catégorie du client</label><select id="f_categorie"></select></div>
       </div>
-      <div class="field"><label>Adresse</label><textarea id="f_adresse"></textarea></div>
+      <div class="field"><label>Corps de métier</label>
+        <input id="f_metier" type="text" list="metiersList" placeholder="Ex : Charpentier">
+        <datalist id="metiersList"></datalist>
+      </div>
+      <div class="field"><label>Adresse</label>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <button type="button" class="btn ghost sm" id="adrModeLibre" style="flex:1">Adresse complète</button>
+          <button type="button" class="btn ghost sm" id="adrModeChamps" style="flex:1">Par champs</button>
+        </div>
+        <textarea id="f_adresse" placeholder="15 rue du Moulin, 26270 Loriol-sur-Drôme"></textarea>
+        <div id="adrChamps" class="hidden">
+          <input id="f_adrRue" type="text" placeholder="N° et rue" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);margin-bottom:8px">
+          <div style="display:flex;gap:8px">
+            <input id="f_adrCp" type="text" placeholder="Code postal" style="flex:0 0 130px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)">
+            <input id="f_adrVille" type="text" placeholder="Ville" style="flex:1;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)">
+          </div>
+        </div>
+      </div>
       <div class="field"><label>Point GPS (pour la carte)</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <input id="f_gps" type="text" placeholder="45.0412, 4.8123" style="flex:1;min-width:150px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)">
           <button class="btn ghost" id="btnGeo" type="button">📍 Depuis l'adresse</button>
         </div>
         <div id="geoMsg" style="font-size:12px;color:var(--muted);margin-top:6px">Laissez vide si inutile. Vous pouvez aussi coller des coordonnées copiées depuis Google Maps.</div>
+      </div>
+      <div class="field"><label>Tarifs pratiqués (€/m³)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+          <input id="f_tarifEss" type="text" list="essencesList" placeholder="Essence" style="flex:1;min-width:120px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)">
+          <datalist id="essencesList"></datalist>
+          <input id="f_tarifPrix" type="text" placeholder="Prix €/m³" style="flex:0 0 120px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)">
+          <button type="button" class="btn" id="f_tarifAdd">Ajouter</button>
+        </div>
+        <div id="tarifList" style="margin-top:10px"></div>
       </div>
       <div class="field"><label>Informations générales</label><textarea id="f_infos" placeholder="Notes, contexte, préférences…"></textarea></div>
     </div>
@@ -1220,7 +1258,8 @@ window.crmDevisPDF = genererDevisPDF;
 
   function emptyClient(){
     return { type:"particulier", prenom:"", nom:"", tel:"", mail:"", societe:"",
-             interlocuteurs:[], adresse:"", infos:"", suivi:"", categorie:"", lat:null, lng:null,
+             interlocuteurs:[], adresse:"", adrMode:"libre", adrRue:"", adrCp:"", adrVille:"",
+             infos:"", suivi:"", categorie:"", metier:"", numero:"", tarifs:[], lat:null, lng:null,
              factures:[], echanges:[], actions:[], createdAt:new Date().toISOString() };
   }
 
@@ -1266,6 +1305,17 @@ window.crmDevisPDF = genererDevisPDF;
     {v:"inactif",      l:"Inactif",             bg:"#fceaea", fg:"#c0392b"}
   ];
   function cat(v){ for(var i=0;i<CATEGORIES.length;i++) if(CATEGORIES[i].v===v) return CATEGORIES[i]; return null; }
+
+  // ---------- Adresse (libre ou par champs) ----------
+  function adresseTexte(d){
+    if((d.adrMode||"libre")==="champs"){
+      var l2=[d.adrCp||"", d.adrVille||""].filter(Boolean).join(" ");
+      return [d.adrRue||"", l2].filter(Boolean).join("\n");
+    }
+    return d.adresse||"";
+  }
+  var ESSENCES = ["Sapin","Épicéa","Mélèze","Pin","Chêne","Hêtre","Douglas","Châtaignier","Frêne","Peuplier"];
+  var METIERS = ["Charpentier","Menuisier","Ébéniste","Constructeur bois","Couvreur","Maçon","Paysagiste","Agriculteur","Négociant","Particulier","Collectivité","Architecte"];
 
   // ---------- Statistiques client ----------
   function moisCle(iso){ return String(iso||"").slice(0,7); }
@@ -1350,13 +1400,17 @@ window.crmDevisPDF = genererDevisPDF;
     return { type:d.type||"particulier", prenom:d.prenom||"", nom:d.nom||"", tel:d.tel||"", mail:d.mail||"",
       societe:d.societe||"", interlocuteurs:d.interlocuteurs||[], adresse:d.adresse||"", infos:d.infos||"",
       factures:d.factures||[], echanges:d.echanges||[], actions:d.actions||[], suivi_par:d.suivi||"",
-      categorie:d.categorie||"", lat:(d.lat===""||d.lat==null)?null:Number(d.lat), lng:(d.lng===""||d.lng==null)?null:Number(d.lng), created_at:d.createdAt||new Date().toISOString() };
+      categorie:d.categorie||"", metier:d.metier||"", numero:d.numero||"", tarifs:d.tarifs||[],
+      adr_mode:d.adrMode||"libre", adr_rue:d.adrRue||"", adr_cp:d.adrCp||"", adr_ville:d.adrVille||"",
+      lat:(d.lat===""||d.lat==null)?null:Number(d.lat), lng:(d.lng===""||d.lng==null)?null:Number(d.lng), created_at:d.createdAt||new Date().toISOString() };
   }
   function mapFromRow(r){
     return { type:r.type||"particulier", prenom:r.prenom||"", nom:r.nom||"", tel:r.tel||"", mail:r.mail||"",
       societe:r.societe||"", interlocuteurs:r.interlocuteurs||[], adresse:r.adresse||"", infos:r.infos||"",
       factures:r.factures||[], echanges:r.echanges||[], actions:r.actions||[], suivi:r.suivi_par||"",
-      categorie:r.categorie||"", lat:(r.lat==null?null:Number(r.lat)), lng:(r.lng==null?null:Number(r.lng)), createdAt:r.created_at||new Date().toISOString() };
+      categorie:r.categorie||"", metier:r.metier||"", numero:r.numero||"", tarifs:r.tarifs||[],
+      adrMode:r.adr_mode||"libre", adrRue:r.adr_rue||"", adrCp:r.adr_cp||"", adrVille:r.adr_ville||"",
+      lat:(r.lat==null?null:Number(r.lat)), lng:(r.lng==null?null:Number(r.lng)), createdAt:r.created_at||new Date().toISOString() };
   }
 
   async function persist(client){
@@ -1411,7 +1465,7 @@ window.crmDevisPDF = genererDevisPDF;
     var arr = clients.slice().sort(function(a,b){ return displayName(a.data).localeCompare(displayName(b.data),"fr"); });
     if(!q) return arr;
     return arr.filter(function(c){
-      var d=c.data, hay = displayName(d)+" "+(d.suivi||"")+" "+((cat(d.categorie)||{}).l||"")+" "+(d.mail||"")+" "+(d.tel||"")+" "+(d.societe||"");
+      var d=c.data, hay = displayName(d)+" "+(d.numero||"")+" "+(d.metier||"")+" "+(d.adrCp||"")+" "+(d.adrVille||"")+" "+(d.suivi||"")+" "+((cat(d.categorie)||{}).l||"")+" "+(d.mail||"")+" "+(d.tel||"")+" "+(d.societe||"");
       (d.interlocuteurs||[]).forEach(function(it){ hay += " "+(it.nom||"")+" "+(it.mail||""); });
       return hay.toLowerCase().indexOf(q)>=0;
     });
@@ -1436,8 +1490,35 @@ window.crmDevisPDF = genererDevisPDF;
       el.addEventListener("click", function(){ filterSuivi = el.getAttribute("data-f"); renderList(); });
     });
   }
+  var selMail = [];
+  function mailsDe(d){
+    var out=[];
+    if(d.mail) out.push(d.mail);
+    (d.interlocuteurs||[]).forEach(function(it){ if(it.mail) out.push(it.mail); });
+    return out;
+  }
+  function renderSelBar(){
+    var bar=$("selBar");
+    if(!selMail.length){ bar.innerHTML=""; bar.classList.add("hidden"); return; }
+    bar.classList.remove("hidden");
+    var nbMails=0;
+    selMail.forEach(function(id){ var c=getClient(id); if(c) nbMails += mailsDe(c.data).length; });
+    bar.innerHTML = '<span>'+selMail.length+' sélectionné'+(selMail.length>1?'s':'')+' · '+nbMails+' email'+(nbMails>1?'s':'')+'</span>'+
+      '<button class="btn sm" id="selMailGo"'+(nbMails?'':' disabled')+'>✉️ Écrire à tous</button>'+
+      '<button class="btn ghost sm" id="selMailClear">Annuler</button>';
+    if($("selMailGo")) $("selMailGo").addEventListener("click", ecrireGroupe);
+    if($("selMailClear")) $("selMailClear").addEventListener("click", function(){ selMail=[]; renderList(); });
+  }
+  function ecrireGroupe(){
+    var mails=[];
+    selMail.forEach(function(id){ var c=getClient(id); if(c) mailsDe(c.data).forEach(function(m){ if(mails.indexOf(m)<0) mails.push(m); }); });
+    if(!mails.length){ toast("Aucune adresse email sur la sélection"); return; }
+    var url = "mailto:?bcc="+encodeURIComponent(mails.join(","));
+    window.location.href = url;
+    toast(mails.length+" destinataire(s) en copie cachée");
+  }
   function renderList(){
-    renderTeamBar();
+    renderTeamBar(); renderSelBar();
     var ul = $("clientList"), arr = filteredClients();
     if(filterSuivi){ arr = arr.filter(function(c){ var m=membre(c.data.suivi); return m && m.nom===filterSuivi; }); }
     if(!arr.length){ ul.innerHTML = '<div class="empty">Aucun client.<br>Cliquez sur « + Nouveau ».</div>'; return; }
@@ -1448,15 +1529,27 @@ window.crmDevisPDF = genererDevisPDF;
       var sub = isPro(d) ? (n>0 ? (n+" interlocuteur"+(n>1?"s":"")) : "Aucun interlocuteur") : (d.mail || d.tel || "—");
       var col = couleurDe(d.suivi);
       var liStyle = col ? ' style="background:'+col.bg+';border-left:4px solid '+col.fg+'"' : '';
+      var coche = selMail.indexOf(c.id)>=0;
       if(d.suivi) sub += " · 👤 "+d.suivi;
       if(cat(d.categorie)) sub = cat(d.categorie).l+" · "+sub;
+      if(d.metier) sub = d.metier+" · "+sub;
+      if(d.numero) sub = d.numero+" · "+sub;
       return '<li data-id="'+c.id+'" class="'+(c.id===selectedId?"active":"")+'"'+liStyle+'>'+
+        '<input type="checkbox" class="cl-check" data-sel="'+c.id+'" '+(coche?"checked":"")+' title="Sélectionner pour un email groupé">'+
         '<div class="avatar" style="background:'+colorFor(c.id)+'">'+esc(initials(d))+'</div>'+
         '<div style="min-width:0">'+
           '<div class="cl-name">'+esc(displayName(d))+'</div>'+
           '<div class="cl-sub"><span class="tag '+(isPro(d)?"pro":"particulier")+'" style="font-size:10px;padding:1px 6px;margin-right:5px">'+(isPro(d)?"Pro":"Part.")+'</span>'+esc(sub)+'</div>'+
         '</div><div class="cl-meta">'+meta+'</div></li>';
     }).join("");
+    Array.prototype.forEach.call(ul.querySelectorAll("[data-sel]"), function(ch){
+      ch.addEventListener("click", function(ev){
+        ev.stopPropagation();
+        var id=ch.getAttribute("data-sel"), i=selMail.indexOf(id);
+        if(i>=0) selMail.splice(i,1); else selMail.push(id);
+        renderSelBar();
+      });
+    });
     Array.prototype.forEach.call(ul.querySelectorAll("li"), function(li){
       li.addEventListener("click", function(){ selectedId = li.getAttribute("data-id"); delete devisCache[selectedId]; render(); });
     });
@@ -1510,98 +1603,123 @@ window.crmDevisPDF = genererDevisPDF;
 
     var since = clientSince(d);
 
+    var tarifsHTML = (d.tarifs||[]).slice().sort(function(a,b){ return String(a.essence||"").localeCompare(String(b.essence||""),"fr",{sensitivity:"base"}); })
+      .map(function(t){ return '<div class="tarif-line"><span class="t-ess">'+esc(t.essence)+'</span><span class="t-prix">'+fmtEuro(parseAmount(t.prix))+' / m³</span></div>'; })
+      .join("") || '<div class="empty" style="padding:12px">Aucun tarif enregistré. Utilisez « Modifier » pour en ajouter.</div>';
+
     area.innerHTML =
       '<div class="detail-head">'+
         '<div class="avatar" style="background:'+colorFor(c.id)+'">'+esc(initials(d))+'</div>'+
         '<div class="detail-title">'+
+          (d.numero?'<div class="num-cli">'+esc(d.numero)+'</div>':'')+
           '<h2>'+esc(displayName(d))+' <span class="tag '+(isPro(d)?"pro":"particulier")+'" style="vertical-align:middle;font-size:12px">'+(isPro(d)?"Pro":"Particulier")+'</span></h2>'+
-          '<p>'+esc(isPro(d)?"Entreprise":"Particulier")+'</p>'+
+          '<p>'+esc(d.metier || (isPro(d)?"Entreprise":"Particulier"))+'</p>'+
           (cat(d.categorie) ? '<span class="cat" style="background:'+cat(d.categorie).bg+';color:'+cat(d.categorie).fg+';margin-top:4px">'+esc(cat(d.categorie).l)+'</span> ' : '')+
           (d.suivi ? (function(){ var col=couleurDe(d.suivi)||PALETTE.gris; return '<span class="suivi-badge" style="background:'+col.bg+';color:'+col.fg+'">👤 Suivi par '+esc(d.suivi)+'</span>'; })() : '')+
         '</div>'+
         '<div class="head-actions">'+
-          '<button class="btn ghost sm" id="btnBack">← Actions à venir</button>'+
+          '<button class="btn ghost sm" id="btnBack">← Accueil</button>'+
           '<button class="btn ghost sm" id="btnEdit">Modifier</button>'+
           '<button class="btn danger sm" id="btnDelete">Supprimer</button>'+
         '</div>'+
       '</div>'+
 
-      '<div class="two-col">'+
-        '<div class="col-box">'+
-          '<div class="section-title" style="margin-top:0">Prochaines actions</div>'+
-          '<div class="sub-add">'+
-            '<input type="text" id="act_label" placeholder="Action à faire (ex : rappeler pour devis)">'+
-            '<input type="date" id="act_date" class="date">'+
-            '<input type="time" id="act_time" class="time" title="Heure (facultatif)">'+
-            '<button class="btn sm" id="act_add">Ajouter</button>'+
+      '<div class="tabs" id="detailTabs">'+
+        '<button data-tab="suivi" class="'+(detailTab==="suivi"?"on":"")+'">Suivi</button>'+
+        '<button data-tab="infos" class="'+(detailTab==="infos"?"on":"")+'">Informations</button>'+
+        '<button data-tab="compta" class="'+(detailTab==="compta"?"on":"")+'">Devis & factures</button>'+
+        '<button data-tab="stats" class="'+(detailTab==="stats"?"on":"")+'">Statistiques</button>'+
+      '</div>'+
+
+      // ── Onglet SUIVI ──
+      '<div class="pane'+(detailTab==="suivi"?"":" hidden")+'" data-pane="suivi">'+
+        '<div class="two-col">'+
+          '<div class="col-box">'+
+            '<div class="section-title" style="margin-top:0">Prochaines actions</div>'+
+            '<div class="sub-add">'+
+              '<input type="text" id="act_label" placeholder="Action à faire (ex : rappeler pour devis)">'+
+              '<input type="date" id="act_date" class="date">'+
+              '<input type="time" id="act_time" class="time" title="Heure (facultatif)">'+
+              '<button class="btn sm" id="act_add">Ajouter</button>'+
+            '</div>'+
+            '<ul class="line-list" id="actList">'+actionsHTML+'</ul>'+
           '</div>'+
-          '<ul class="line-list" id="actList">'+actionsHTML+'</ul>'+
-        '</div>'+
-        '<div class="col-box">'+
-          '<div class="section-title" style="margin-top:0">Historique des échanges</div>'+
-          '<div class="sub-add">'+
-            '<input type="date" id="ech_date" class="date">'+
-            '<textarea id="ech_text" placeholder="Contenu de l\'échange (appel, email, rendez-vous…)"></textarea>'+
-            '<button class="btn sm" id="ech_add">Consigner</button>'+
+          '<div class="col-box">'+
+            '<div class="section-title" style="margin-top:0">Historique des échanges</div>'+
+            '<div class="sub-add">'+
+              '<input type="date" id="ech_date" class="date">'+
+              '<textarea id="ech_text" placeholder="Contenu de l\'échange (appel, email, rendez-vous…)"></textarea>'+
+              '<button class="btn sm" id="ech_add">Consigner</button>'+
+            '</div>'+
+            '<div id="echList" class="scroll-box">'+echangesHTML+'</div>'+
           '</div>'+
-          '<div id="echList" class="scroll-box">'+echangesHTML+'</div>'+
         '</div>'+
       '</div>'+
 
-      '<div class="info-grid">'+
-        (isPro(d) ? '' : infoItem("Téléphone", d.tel ? '<a href="tel:'+esc(d.tel)+'">'+esc(d.tel)+'</a>' : '<span class="muted">—</span>'))+
-        (isPro(d) ? '' : infoItem("Email", d.mail ? '<a href="mailto:'+esc(d.mail)+'">'+esc(d.mail)+'</a>' : '<span class="muted">—</span>'))+
-        infoItem("Adresse", d.adresse ? esc(d.adresse).replace(/\n/g,"<br>") : '<span class="muted">—</span>')+
-        infoItem("Client depuis", since ? esc(fmtDate(since))+' <span class="total-sub">(1ʳᵉ facture)</span>' : '<span class="muted">Aucune facture</span>')+
+      // ── Onglet INFORMATIONS ──
+      '<div class="pane'+(detailTab==="infos"?"":" hidden")+'" data-pane="infos">'+
+        '<div class="info-grid">'+
+          (isPro(d) ? '' : infoItem("Téléphone", d.tel ? '<a href="tel:'+esc(d.tel)+'">'+esc(d.tel)+'</a>' : '<span class="muted">—</span>'))+
+          (isPro(d) ? '' : infoItem("Email", d.mail ? '<a href="mailto:'+esc(d.mail)+'">'+esc(d.mail)+'</a>' : '<span class="muted">—</span>'))+
+          infoItem("Adresse", adresseTexte(d) ? esc(adresseTexte(d)).replace(/\n/g,"<br>") : '<span class="muted">—</span>')+
+          infoItem("Corps de métier", d.metier ? esc(d.metier) : '<span class="muted">—</span>')+
+          infoItem("N° client", d.numero ? esc(d.numero) : '<span class="muted">—</span>')+
+          infoItem("Client depuis", since ? esc(fmtDate(since))+' <span class="total-sub">(1ʳᵉ facture)</span>' : '<span class="muted">Aucune facture</span>')+
+        '</div>'+
+        (d.infos ? '<div class="info-item" style="margin-top:12px"><div class="lbl">Informations générales</div><div class="val">'+esc(d.infos).replace(/\n/g,"<br>")+'</div></div>' : '')+
+        interlocHTML +
+        '<div class="section-title">Tarifs pratiqués (€/m³)</div>'+
+        tarifsHTML+
       '</div>'+
-      (d.infos ? '<div class="info-item" style="margin-top:12px"><div class="lbl">Informations générales</div><div class="val">'+esc(d.infos).replace(/\n/g,"<br>")+'</div></div>' : '')+
 
-      interlocHTML +
-      '<div class="section-title" style="display:flex;justify-content:space-between;align-items:center">Devis en cours (Cubeur)<button class="btn ghost sm" id="devisRefresh" style="text-transform:none;letter-spacing:0">↻ Actualiser</button></div>'+
-      '<div id="devisBox">'+devisHTML(c.id)+'</div>'+
+      // ── Onglet DEVIS & FACTURES ──
+      '<div class="pane'+(detailTab==="compta"?"":" hidden")+'" data-pane="compta">'+
+        '<div class="section-title" style="display:flex;justify-content:space-between;align-items:center;margin-top:0">Devis en cours (Cubeur)<button class="btn ghost sm" id="devisRefresh" style="text-transform:none;letter-spacing:0">↻ Actualiser</button></div>'+
+        '<div id="devisBox">'+devisHTML(c.id)+'</div>'+
+        '<div class="section-title">Factures</div>'+
+        '<div class="totals-row">'+
+          '<div class="total-card"><span class="tc-lbl">Total HT</span><span class="tc-val">'+fmtEuro(sumFacturesHT(d))+'</span></div>'+
+          '<div class="total-card"><span class="tc-lbl">Total TTC</span><span class="tc-val">'+fmtEuro(sumFacturesTTC(d))+'</span></div>'+
+        '</div>'+
+        '<div class="sub-add">'+
+          '<input type="text" id="fac_label" placeholder="Libellé (ex : Facture #2026-012)">'+
+          '<input type="date" id="fac_date" class="date">'+
+        '</div>'+
+        '<div class="sub-add">'+
+          '<input type="text" id="fac_ht" class="narrow" placeholder="Montant HT">'+
+          '<input type="text" id="fac_ttc" class="narrow" placeholder="Montant TTC (auto 20%)">'+
+          '<input type="text" id="fac_note" placeholder="Note (facultatif)">'+
+        '</div>'+
+        '<div class="sub-add">'+
+          '<input type="file" id="fac_file" style="flex:1;min-width:150px">'+
+          '<button class="btn sm" id="fac_add">Ajouter la facture</button>'+
+        '</div>'+
+        '<ul class="line-list" id="facList">'+facturesHTML+'</ul>'+
+      '</div>'+
 
-      '<div class="section-title">Factures</div>'+
-      '<div class="totals-row">'+
-        '<div class="total-card"><span class="tc-lbl">Total HT</span><span class="tc-val">'+fmtEuro(sumFacturesHT(d))+'</span></div>'+
-        '<div class="total-card"><span class="tc-lbl">Total TTC</span><span class="tc-val">'+fmtEuro(sumFacturesTTC(d))+'</span></div>'+
-      '</div>'+
-      '<div class="sub-add">'+
-        '<input type="text" id="fac_label" placeholder="Libellé (ex : Facture #2026-012)">'+
-        '<input type="date" id="fac_date" class="date">'+
-      '</div>'+
-      '<div class="sub-add">'+
-        '<input type="text" id="fac_ht" class="narrow" placeholder="Montant HT">'+
-        '<input type="text" id="fac_ttc" class="narrow" placeholder="Montant TTC (auto 20%)">'+
-        '<input type="text" id="fac_note" placeholder="Note (facultatif)">'+
-      '</div>'+
-      '<div class="sub-add">'+
-        '<input type="file" id="fac_file" style="flex:1;min-width:150px">'+
-        '<button class="btn sm" id="fac_add">Ajouter la facture</button>'+
-      '</div>'+
-      '<ul class="line-list" id="facList">'+facturesHTML+'</ul>'+
+      // ── Onglet STATISTIQUES ──
+      '<div class="pane'+(detailTab==="stats"?"":" hidden")+'" data-pane="stats">'+
+        '<div id="statsBox">'+(detailTab==="stats"?statsHTML(d):'')+'</div>'+
+      '</div>';
 
-      '<div class="section-title sec-toggle" id="statsToggle">'+
-        '<span>'+(statsOpen?"▾":"▸")+' Statistiques du client</span>'+
-        '<span class="sec-hint">'+(statsOpen?"masquer":"afficher")+'</span>'+
-      '</div>'+
-      '<div id="statsBox"'+(statsOpen?'':' class="hidden"')+'>'+(statsOpen?statsHTML(d):'')+'</div>'+
-
-      '';
+    Array.prototype.forEach.call($("detailTabs").querySelectorAll("[data-tab]"), function(b){
+      b.addEventListener("click", function(){
+        detailTab = b.getAttribute("data-tab");
+        Array.prototype.forEach.call($("detailTabs").querySelectorAll("[data-tab]"), function(x){ x.classList.toggle("on", x===b); });
+        Array.prototype.forEach.call(document.querySelectorAll("[data-pane]"), function(pane){
+          pane.classList.toggle("hidden", pane.getAttribute("data-pane")!==detailTab);
+        });
+        if(detailTab==="stats" && $("statsBox") && !$("statsBox").innerHTML.trim()) $("statsBox").innerHTML = statsHTML(d);
+      });
+    });
 
     bindDetail(c);
-    $("statsToggle").addEventListener("click", function(){
-      statsOpen = !statsOpen;
-      var box=$("statsBox");
-      if(statsOpen){ box.innerHTML = statsHTML(d); box.classList.remove("hidden"); }
-      else { box.classList.add("hidden"); box.innerHTML = ""; }
-      $("statsToggle").innerHTML = '<span>'+(statsOpen?"▾":"▸")+' Statistiques du client</span><span class="sec-hint">'+(statsOpen?"masquer":"afficher")+'</span>';
-    });
     $("devisRefresh").addEventListener("click", function(){ $("devisBox").innerHTML='<div class="empty" style="padding:12px">Chargement…</div>'; loadDevis(c.id); });
     if(devisCache[c.id]===undefined) loadDevis(c.id);
   }
 
   // ---------- Devis du Cubeur liés à ce client ----------
-  var statsOpen = false;   // section « Statistiques » repliée par défaut
+  var detailTab = "suivi";  // onglet actif de la fiche client
   var devisCache = {};   // clientId -> [commandes] | {error}
   async function loadDevis(clientId){
     devisCache[clientId] = null; // chargement
@@ -1764,7 +1882,7 @@ window.crmDevisPDF = genererDevisPDF;
     var go=$("itiGo"); if(go) go.addEventListener("click", ouvrirMaps);
     var cl=$("itiClear"); if(cl) cl.addEventListener("click", function(){ itiSel=[]; majIti(); });
   }
-  var mapFiltreCat="", mapFiltreSuivi="";
+  var mapFiltreCat="", mapFiltreSuivi="", mapFiltreCp="";
   function clientsCarte(){
     return clients.filter(function(c){
       var d=c.data;
@@ -1772,6 +1890,7 @@ window.crmDevisPDF = genererDevisPDF;
       if(mapFiltreCat==="__aucune__"){ if(cat(d.categorie)) return false; }
       else if(mapFiltreCat && (d.categorie||"")!==mapFiltreCat) return false;
       if(mapFiltreSuivi){ var m=membre(d.suivi); if(!m||m.nom!==mapFiltreSuivi) return false; }
+      if(mapFiltreCp && (d.adrCp||"")!==mapFiltreCp) return false;
       return true;
     });
   }
@@ -1788,6 +1907,19 @@ window.crmDevisPDF = genererDevisPDF;
       }).join("")+
       (sansCat?'<span class="team-chip'+(mapFiltreCat==="__aucune__"?" on":"")+'" data-mc="__aucune__">Non classés ('+loc.filter(function(c){ return !cat(c.data.categorie); }).length+')</span>':'')+
       '</div>';
+    var cps = [];
+    loc.forEach(function(c){ var cp=(c.data.adrCp||"").trim(); if(cp && cps.indexOf(cp)<0) cps.push(cp); });
+    cps.sort();
+    if(cps.length){
+      h += '<div class="team-bar"><label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px">Code postal :'+
+        '<select id="mapCp" style="padding:5px 8px;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);font-size:12.5px">'+
+        '<option value="">Tous</option>'+
+        cps.map(function(cp){
+          var n=loc.filter(function(c){ return (c.data.adrCp||"")===cp; }).length;
+          return '<option value="'+esc(cp)+'"'+(mapFiltreCp===cp?" selected":"")+'>'+esc(cp)+' ('+n+')</option>';
+        }).join("")+
+        '</select></label></div>';
+    }
     if(membres.length){
       h += '<div class="team-bar">'+
         '<span class="team-chip'+(mapFiltreSuivi===""?" on":"")+'" data-ms="">Tous les interlocuteurs</span>'+
@@ -1845,6 +1977,7 @@ window.crmDevisPDF = genererDevisPDF;
     Array.prototype.forEach.call(document.querySelectorAll("[data-ms]"), function(el){
       el.addEventListener("click", function(){ mapFiltreSuivi = el.getAttribute("data-ms"); render(); });
     });
+    if($("mapCp")) $("mapCp").addEventListener("change", function(){ mapFiltreCp = $("mapCp").value; render(); });
     Array.prototype.forEach.call(document.querySelectorAll("[data-goto]"), function(el){
       el.addEventListener("click", function(){ selectedId = el.getAttribute("data-goto"); render(); });
     });
@@ -2028,7 +2161,9 @@ window.crmDevisPDF = genererDevisPDF;
     return {lat:Math.round(la*1e6)/1e6, lng:Math.round(ln*1e6)/1e6};
   }
   async function geocoder(){
-    var adr = ($("f_adresse").value||"").trim().replace(/\n/g," ");
+    var adr = (adrModeActuel()==="champs"
+      ? [($("f_adrRue").value||""), ($("f_adrCp").value||""), ($("f_adrVille").value||"")].filter(Boolean).join(" ")
+      : ($("f_adresse").value||"")).trim().replace(/\n/g," ");
     if(!adr){ $("geoMsg").textContent = "Renseignez d'abord l'adresse."; return; }
     $("btnGeo").disabled = true; $("geoMsg").textContent = "Recherche de l'adresse…";
     try{
@@ -2044,6 +2179,49 @@ window.crmDevisPDF = genererDevisPDF;
     $("btnGeo").disabled = false;
   }
 
+  var editTarifs = [];
+  function renderTarifsEdit(){
+    var box=$("tarifList");
+    var arr = editTarifs.slice().sort(function(a,b){ return String(a.essence||"").localeCompare(String(b.essence||""),"fr",{sensitivity:"base"}); });
+    box.innerHTML = arr.length ? arr.map(function(t){
+      return '<div class="tarif-line"><span class="t-ess">'+esc(t.essence)+'</span><span class="t-prix">'+fmtEuro(parseAmount(t.prix))+' / m³</span>'+
+             '<button class="x" data-rmt="'+esc(t.essence)+'" type="button">✕</button></div>';
+    }).join("") : '<div class="empty" style="padding:8px;font-size:12.5px">Aucun tarif pour ce client.</div>';
+    Array.prototype.forEach.call(box.querySelectorAll("[data-rmt]"), function(b){
+      b.addEventListener("click", function(){
+        var ess=b.getAttribute("data-rmt");
+        editTarifs = editTarifs.filter(function(t){ return t.essence!==ess; });
+        renderTarifsEdit();
+      });
+    });
+  }
+  function ajouterTarif(){
+    var ess=($("f_tarifEss").value||"").trim(), prix=($("f_tarifPrix").value||"").trim();
+    if(!ess){ toast("Choisissez une essence"); return; }
+    if(!prix || !parseAmount(prix)){ toast("Saisissez un prix"); return; }
+    var i = editTarifs.findIndex ? editTarifs.findIndex(function(t){ return t.essence.toLowerCase()===ess.toLowerCase(); }) : -1;
+    if(i>=0) editTarifs[i].prix = prix; else editTarifs.push({essence:ess, prix:prix});
+    $("f_tarifEss").value=""; $("f_tarifPrix").value=""; $("f_tarifEss").focus();
+    renderTarifsEdit();
+  }
+  function setAdrMode(mode){
+    var champs = mode==="champs";
+    $("adrChamps").classList.toggle("hidden", !champs);
+    $("f_adresse").classList.toggle("hidden", champs);
+    $("adrModeLibre").style.background = champs ? "transparent" : "var(--accent-soft)";
+    $("adrModeChamps").style.background = champs ? "var(--accent-soft)" : "transparent";
+    $("adrModeLibre").dataset.on = champs ? "" : "1";
+  }
+  function adrModeActuel(){ return $("adrChamps").classList.contains("hidden") ? "libre" : "champs"; }
+  function prochainNumero(){
+    var max=0;
+    clients.forEach(function(c){
+      var m=/(\d+)\s*$/.exec(c.data.numero||"");
+      if(m){ var n=parseInt(m[1],10); if(n>max) max=n; }
+    });
+    return "CLI-"+String(max+1).padStart(4,"0");
+  }
+
   function openModal(id){
     editingId = id || null;
     $("modalTitle").textContent = id ? "Modifier le client" : "Nouveau client";
@@ -2052,6 +2230,14 @@ window.crmDevisPDF = genererDevisPDF;
     $("f_prenom").value=d.prenom||""; $("f_nom").value=d.nom||""; $("f_tel").value=d.tel||""; $("f_mail").value=d.mail||"";
     $("f_societe").value=d.societe||""; $("f_adresse").value=d.adresse||""; $("f_infos").value=d.infos||"";
     fillCategories(d.categorie||"");
+    $("metiersList").innerHTML = METIERS.map(function(m){ return '<option value="'+esc(m)+'">'; }).join("");
+    $("essencesList").innerHTML = ESSENCES.map(function(e){ return '<option value="'+esc(e)+'">'; }).join("");
+    $("f_metier").value = d.metier||"";
+    $("f_numero").value = d.numero || (id ? "" : prochainNumero());
+    $("f_adrRue").value=d.adrRue||""; $("f_adrCp").value=d.adrCp||""; $("f_adrVille").value=d.adrVille||"";
+    setAdrMode(d.adrMode||"libre");
+    editTarifs = (d.tarifs||[]).map(function(t){ return {essence:t.essence, prix:t.prix}; });
+    $("f_tarifEss").value=""; $("f_tarifPrix").value=""; renderTarifsEdit();
     $("f_gps").value = (d.lat!=null&&d.lng!=null) ? (d.lat+", "+d.lng) : "";
     $("geoMsg").textContent = "Laissez vide si inutile. Vous pouvez aussi coller des coordonnées copiées depuis Google Maps.";
     editInterlocs = (d.interlocuteurs||[]).map(function(x){ return Object.assign({}, x); });
@@ -2075,6 +2261,11 @@ window.crmDevisPDF = genererDevisPDF;
     d.interlocuteurs = type==="pro" ? editInterlocs.filter(function(it){ return (it.nom||it.mail||it.tel||it.poste); }).map(function(it){ return { id:it.id||shortId(), nom:it.nom||"", poste:it.poste||"", tel:it.tel||"", mail:it.mail||"" }; }) : (d.interlocuteurs||[]);
     d.adresse=$("f_adresse").value.trim(); d.infos=$("f_infos").value.trim();
     d.categorie=$("f_categorie").value;
+    d.metier=($("f_metier").value||"").trim();
+    d.numero=($("f_numero").value||"").trim() || prochainNumero();
+    d.adrMode=adrModeActuel();
+    d.adrRue=($("f_adrRue").value||"").trim(); d.adrCp=($("f_adrCp").value||"").trim(); d.adrVille=($("f_adrVille").value||"").trim();
+    d.tarifs=editTarifs.slice();
     var gpsTxt=($("f_gps").value||"").trim();
     if(!gpsTxt){ d.lat=null; d.lng=null; }
     else { var g=parseGPS(gpsTxt); if(!g){ toast("Point GPS invalide (ex : 45.0412, 4.8123)"); return; } d.lat=g.lat; d.lng=g.lng; }
@@ -2137,6 +2328,10 @@ window.crmDevisPDF = genererDevisPDF;
   $("f_type").addEventListener("change", toggleTypeFields);
   $("f_suivi").addEventListener("change", onSuiviChange);
   $("btnGeo").addEventListener("click", geocoder);
+  $("f_tarifAdd").addEventListener("click", ajouterTarif);
+  $("f_tarifPrix").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); ajouterTarif(); } });
+  $("adrModeLibre").addEventListener("click", function(){ setAdrMode("libre"); });
+  $("adrModeChamps").addEventListener("click", function(){ setAdrMode("champs"); });
   $("facClose").addEventListener("click", closeFacModal);
   $("facCancel").addEventListener("click", closeFacModal);
   $("facSave").addEventListener("click", saveFacModal);
