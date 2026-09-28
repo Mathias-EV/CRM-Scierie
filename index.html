@@ -1309,6 +1309,7 @@ window.crmDevisPDF = genererDevisPDF;
   function cat(v){ for(var i=0;i<CATEGORIES.length;i++) if(CATEGORIES[i].v===v) return CATEGORIES[i]; return null; }
 
   // ---------- Ajout d'une action à Google Agenda ----------
+  var COMPTE_AGENDA = "verdonscierie@gmail.com";   // agenda de la scierie
   function gDate(dt){ // Date -> 20260405T140000Z
     return dt.getUTCFullYear()+
       String(dt.getUTCMonth()+1).padStart(2,"0")+
@@ -1342,7 +1343,8 @@ window.crmDevisPDF = genererDevisPDF;
       "&text="+encodeURIComponent(titre)+
       "&dates="+dates+
       "&details="+encodeURIComponent(details.join("\n"))+
-      "&location="+encodeURIComponent(adresseTexte(d).replace(/\n/g,", "));  // heures envoyées en UTC (suffixe Z)
+      "&location="+encodeURIComponent(adresseTexte(d).replace(/\n/g,", "))+
+      "&authuser="+encodeURIComponent(COMPTE_AGENDA);   // force l'agenda de la scierie ; heures en UTC (suffixe Z)
   }
 
   // ---------- Adresse (libre ou par champs) ----------
