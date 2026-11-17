@@ -288,7 +288,7 @@
         <div class="panel-b">
           <div class="search">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-            <input type="text" id="searchInput" placeholder="Rechercher un client…">
+            <input type="text" id="searchInput" placeholder="Nom, téléphone, email, ville…">
           </div>
           <div class="sel-bar hidden" id="selBar"></div>
           <div class="team-bar" id="teamBar"></div>
@@ -1519,15 +1519,67 @@ window.crmDevisPDF = genererDevisPDF;
 
   // ---------- Data helpers ----------
   function getClient(id){ for(var i=0;i<clients.length;i++) if(clients[i].id===id) return clients[i]; return null; }
+  // Chiffres seuls d'un texte : "06 12.34-56 78" → "0612345678"
+  // Les indicatifs français sont ramenés au format local : +33 6 12… → 0612…
+  function chiffres(v){
+    var n = String(v||"").replace(/\D+/g,"");
+    if(n.indexOf("0033")===0) n = "0"+n.slice(4);
+    else if(n.indexOf("33")===0 && n.length>=10 && n.length<=12) n = "0"+n.slice(2);
+    return n;
+  }
+  // Tous les téléphones d'un client (fiche + interlocuteurs), en chiffres seuls
+  function telsDe(d){
+    var out=[];
+    if(d.tel) out.push(chiffres(d.tel));
+    (d.interlocuteurs||[]).forEach(function(it){ if(it.tel) out.push(chiffres(it.tel)); });
+    return out.filter(Boolean);
+  }
+  // Tous les emails d'un client (fiche + interlocuteurs)
+  function mailsDeClient(d){
+    var out=[];
+    if(d.mail) out.push(String(d.mail).toLowerCase());
+    (d.interlocuteurs||[]).forEach(function(it){ if(it.mail) out.push(String(it.mail).toLowerCase()); });
+    return out;
+  }
+  function correspond(d, q){
+    var hay = displayName(d)+" "+(d.numero||"")+" "+(d.metier||"")+" "+(d.adrCp||"")+" "+(d.adrVille||"")+" "+
+              (d.adrRue||"")+" "+(d.adresse||"")+" "+(d.suivi||"")+" "+((cat(d.categorie)||{}).l||"")+" "+
+              (d.mail||"")+" "+(d.tel||"")+" "+(d.societe||"")+" "+(d.infos||"");
+    (d.interlocuteurs||[]).forEach(function(it){
+      hay += " "+(it.nom||"")+" "+(it.poste||"")+" "+(it.mail||"")+" "+(it.tel||"");
+    });
+    if(hay.toLowerCase().indexOf(q)>=0) return true;
+    // Téléphone : on compare les chiffres, quel que soit le format saisi
+    var qn = chiffres(q);
+    if(qn.length>=3){
+      var tels = telsDe(d);
+      for(var i=0;i<tels.length;i++) if(tels[i].indexOf(qn)>=0) return true;
+    }
+    return false;
+  }
+  // Renvoie le contact qui correspond à la recherche, pour l'afficher dans la liste
+  function contactTrouve(d, q){
+    if(!q) return null;
+    var qn = chiffres(q);
+    function test(label, tel, mail){
+      if(tel && qn.length>=3 && chiffres(tel).indexOf(qn)>=0) return { txt:tel, qui:label, icone:"📞" };
+      if(mail && mail.toLowerCase().indexOf(q)>=0) return { txt:mail, qui:label, icone:"✉️" };
+      return null;
+    }
+    var r = test("", d.tel, d.mail);
+    if(r) return r;
+    var its = d.interlocuteurs||[];
+    for(var i=0;i<its.length;i++){
+      r = test(its[i].nom||"interlocuteur", its[i].tel, its[i].mail);
+      if(r) return r;
+    }
+    return null;
+  }
   function filteredClients(){
     var q = ($("searchInput").value||"").toLowerCase().trim();
     var arr = clients.slice().sort(function(a,b){ return displayName(a.data).localeCompare(displayName(b.data),"fr"); });
     if(!q) return arr;
-    return arr.filter(function(c){
-      var d=c.data, hay = displayName(d)+" "+(d.numero||"")+" "+(d.metier||"")+" "+(d.adrCp||"")+" "+(d.adrVille||"")+" "+(d.suivi||"")+" "+((cat(d.categorie)||{}).l||"")+" "+(d.mail||"")+" "+(d.tel||"")+" "+(d.societe||"");
-      (d.interlocuteurs||[]).forEach(function(it){ hay += " "+(it.nom||"")+" "+(it.mail||""); });
-      return hay.toLowerCase().indexOf(q)>=0;
-    });
+    return arr.filter(function(c){ return correspond(c.data, q); });
   }
   function actKey(a){ return (a.date||"9999-99-99")+" "+(a.time||"99:99"); }
   function fmtWhen(date,time){ return fmtDate(date)+(time?" à "+time.replace(":","h"):""); }
@@ -1593,6 +1645,10 @@ window.crmDevisPDF = genererDevisPDF;
       if(cat(d.categorie)) sub = cat(d.categorie).l+" · "+sub;
       if(d.metier) sub = d.metier+" · "+sub;
       if(d.numero) sub = d.numero+" · "+sub;
+      // si la recherche porte sur un téléphone ou un email, on montre lequel
+      var qCur = ($("searchInput").value||"").toLowerCase().trim();
+      var trouve = contactTrouve(d, qCur);
+      if(trouve) sub = trouve.icone+" "+trouve.txt+(trouve.qui?" ("+trouve.qui+")":"")+" · "+sub;
       return '<li data-id="'+c.id+'" class="'+(c.id===selectedId?"active":"")+'"'+liStyle+'>'+
         '<input type="checkbox" class="cl-check" data-sel="'+c.id+'" '+(coche?"checked":"")+' title="Sélectionner pour un email groupé">'+
         '<div class="avatar" style="background:'+colorFor(c.id)+'">'+esc(initials(d))+'</div>'+
