@@ -213,6 +213,14 @@
   .iti-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-top: 8px; background: var(--bg); }
   .iti-bar .iti-list { flex: 1; min-width: 160px; font-size: 12.5px; color: var(--muted); }
   .iti-bar .iti-list strong { color: var(--text); }
+  .tri-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12.5px; color: var(--muted); }
+  .tri-bar label { font-weight: 600; white-space: nowrap; }
+  .tri-bar select { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 12.5px; }
+  .cl-last { font-size: 12px; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grp-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .grp-toggle:hover { color: var(--accent); }
+  .grp-fleche { font-size: 10px; }
+  .grp-nb { margin-left: auto; font-size: 11px; font-weight: 700; padding: 1px 9px; border-radius: 20px; background: var(--bg); color: var(--muted); }
   .motif-pill { font-size: 11px; padding: 2px 9px; border-radius: 20px; font-weight: 600; white-space: nowrap; display: inline-block; }
   .home-tabs { display: flex; gap: 4px; padding: 4px; background: var(--bg); border-radius: 10px; margin-bottom: 14px; }
   .home-tabs button { flex: 1; padding: 9px 10px; border: none; background: transparent; color: var(--muted); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13.5px; }
@@ -296,6 +304,14 @@
           <div class="search">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             <input type="text" id="searchInput" placeholder="Nom, téléphone, email, ville…">
+          </div>
+          <div class="tri-bar">
+            <label for="triSelect">Trier par</label>
+            <select id="triSelect">
+              <option value="nom">Nom (A → Z)</option>
+              <option value="recent">Dernière interaction — récente d'abord</option>
+              <option value="ancien">Dernière interaction — ancienne d'abord</option>
+            </select>
           </div>
           <div class="sel-bar hidden" id="selBar"></div>
           <div class="team-bar" id="teamBar"></div>
@@ -1584,9 +1600,38 @@ window.crmDevisPDF = genererDevisPDF;
   }
   function filteredClients(){
     var q = ($("searchInput").value||"").toLowerCase().trim();
-    var arr = clients.slice().sort(function(a,b){ return displayName(a.data).localeCompare(displayName(b.data),"fr"); });
+    var arr = clients.slice();
+    if(triListe==="nom"){
+      arr.sort(function(a,b){ return displayName(a.data).localeCompare(displayName(b.data),"fr"); });
+    } else {
+      // "" (jamais contacté) remonte en dernier quand on veut les plus récents
+      arr.sort(function(a,b){
+        var da=derniereInteraction(a.data)||"", db=derniereInteraction(b.data)||"";
+        if(da===db) return displayName(a.data).localeCompare(displayName(b.data),"fr");
+        if(triListe==="recent") return da<db?1:-1;
+        return da>db?1:-1;
+      });
+    }
     if(!q) return arr;
     return arr.filter(function(c){ return correspond(c.data, q); });
+  }
+  // Dernière interaction : échange, repassage ou facture le plus récent (dates passées)
+  function derniereInteraction(d){
+    var auj = todayISO(), best = "";
+    function test(dt){ if(dt && dt<=auj && dt>best) best = dt; }
+    (d.echanges||[]).forEach(function(e){ test(e.date); });
+    (d.repassages||[]).forEach(function(r){ test(r.date); });
+    (d.factures||[]).forEach(function(f){ test(f.date); });
+    return best;
+  }
+  function depuisQuand(iso){
+    if(!iso) return "jamais";
+    var n = -daysUntil(iso);
+    if(n<=0) return "aujourd'hui";
+    if(n===1) return "hier";
+    if(n<30) return "il y a "+n+" j";
+    if(n<365) return "il y a "+Math.round(n/30)+" mois";
+    return "il y a "+Math.floor(n/365)+" an"+(n>=730?"s":"");
   }
   function actKey(a){ return (a.date||"9999-99-99")+" "+(a.time||"99:99"); }
   function fmtWhen(date,time){ return fmtDate(date)+(time?" à "+time.replace(":","h"):""); }
@@ -1617,6 +1662,7 @@ window.crmDevisPDF = genererDevisPDF;
     });
   }
   var selMail = [];
+  var triListe = "nom";   // nom | recent | ancien
   function mailsDe(d){
     var out=[];
     if(d.mail) out.push(d.mail);
@@ -1660,6 +1706,11 @@ window.crmDevisPDF = genererDevisPDF;
       if(cat(d.categorie)) sub = cat(d.categorie).l+" · "+sub;
       if(d.metier) sub = d.metier+" · "+sub;
       if(d.numero) sub = d.numero+" · "+sub;
+      var dernI = derniereInteraction(d);
+      var urgI = dernI ? (-daysUntil(dernI)) : 9999;
+      var couleurI = !dernI ? "var(--danger)" : urgI>120 ? "var(--warn)" : "var(--muted)";
+      var ligneI = '<div class="cl-last" style="color:'+couleurI+'" title="'+(dernI?esc(fmtDate(dernI)):"Aucune interaction enregistrée")+'">'+
+        '🕘 '+esc(depuisQuand(dernI))+(dernI?' · '+esc(fmtWhenCourt(dernI,""))+'':'')+'</div>';
       // si la recherche porte sur un téléphone ou un email, on montre lequel
       var qCur = ($("searchInput").value||"").toLowerCase().trim();
       var trouve = contactTrouve(d, qCur);
@@ -1669,6 +1720,7 @@ window.crmDevisPDF = genererDevisPDF;
         '<div class="avatar" style="background:'+colorFor(c.id)+'">'+esc(initials(d))+'</div>'+
         '<div style="min-width:0">'+
           '<div class="cl-name">'+esc(displayName(d))+'</div>'+
+          ligneI+
           '<div class="cl-sub"><span class="tag '+(isPro(d)?"pro":"particulier")+'" style="font-size:10px;padding:1px 6px;margin-right:5px">'+(isPro(d)?"Pro":"Part.")+'</span>'+esc(sub)+'</div>'+
         '</div><div class="cl-meta">'+meta+'</div></li>';
     }).join("");
@@ -1974,6 +2026,7 @@ window.crmDevisPDF = genererDevisPDF;
 
   // ---------- Agenda (home) ----------
   var homeTab = "afaire";   // onglet de la page d'accueil : afaire | repassages
+  var repGroupe = {};       // motif → false quand le groupe est replié
 
   function renderAgenda(){
     // Actions non terminées
@@ -2040,10 +2093,21 @@ window.crmDevisPDF = genererDevisPDF;
       MOTIFS.forEach(function(m){
         var grp = repsSansDate.filter(function(x){ return x.motif===m.v; });
         if(!grp.length) return;
-        listReps += '<div class="section-title">'+esc(m.l)+' ('+grp.length+')</div>'+grp.map(ligne).join("");
+        var ouvert = repGroupe[m.v]!==false;   // ouvert par défaut
+        listReps += '<div class="section-title grp-toggle" data-grp="'+m.v+'">'+
+            '<span class="grp-fleche">'+(ouvert?"▾":"▸")+'</span> '+esc(m.l)+
+            '<span class="grp-nb" style="background:'+m.bg+';color:'+m.fg+'">'+grp.length+'</span>'+
+          '</div>'+
+          (ouvert?grp.map(ligne).join(""):"");
       });
       var autres = repsSansDate.filter(function(x){ return !motif(x.motif); });
-      if(autres.length) listReps += '<div class="section-title">Autres ('+autres.length+')</div>'+autres.map(ligne).join("");
+      if(autres.length){
+        var ouvA = repGroupe.__autres!==false;
+        listReps += '<div class="section-title grp-toggle" data-grp="__autres">'+
+            '<span class="grp-fleche">'+(ouvA?"▾":"▸")+'</span> Autres'+
+            '<span class="grp-nb">'+autres.length+'</span></div>'+
+          (ouvA?autres.map(ligne).join(""):"");
+      }
     }
 
     var nbAFaire = datees.length + sansDate.length;
@@ -2199,6 +2263,13 @@ window.crmDevisPDF = genererDevisPDF;
     dessinerCarte();
     if($("homeTabs")) Array.prototype.forEach.call($("homeTabs").querySelectorAll("[data-htab]"), function(b){
       b.addEventListener("click", function(){ homeTab = b.getAttribute("data-htab"); render(); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-grp]"), function(h){
+      h.addEventListener("click", function(){
+        var k=h.getAttribute("data-grp");
+        repGroupe[k] = repGroupe[k]===false;   // bascule plié / déplié
+        render();
+      });
     });
     bindIti();
     Array.prototype.forEach.call(document.querySelectorAll("[data-mc]"), function(el){
@@ -2591,6 +2662,7 @@ window.crmDevisPDF = genererDevisPDF;
   });
   $("addInterloc").addEventListener("click", function(){ editInterlocs.push({ id:shortId(), nom:"", poste:"", tel:"", mail:"" }); renderInterlocs(); });
   $("searchInput").addEventListener("input", renderList);
+  $("triSelect").addEventListener("change", function(){ triListe = $("triSelect").value; renderList(); });
   document.addEventListener("keydown", function(e){ if(e.key==="Escape"){ if($("modalBg").classList.contains("open")) closeModal(); if($("facModalBg").classList.contains("open")) closeFacModal(); } });
 
   $("auth_submit").addEventListener("click", doAuth);
