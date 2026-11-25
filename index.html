@@ -9,7 +9,7 @@
     box-sizing: border-box;
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    --bg: #fbfcfe; --panel: #ffffff; --border: #e8edf4; --text: #26303f; --muted: #7a8598;
+    --bg: #fbfcfe; --panel: #ffffff; --border: #e1e8f0; --text: #1f2937; --muted: #5a6676;
     --accent: #2b5ce6; --accent-soft: #eaf0fe; --accent-hover: #1e47c4;
     --danger: #d64545; --danger-soft: #fceaea; --ok: #1f9d63; --warn: #e08600; --warn-soft: #fdf1df;
     --shadow: 0 1px 3px rgba(20,30,50,.06), 0 6px 20px rgba(20,30,50,.05); --radius: 12px;
@@ -33,6 +33,9 @@
   .dot.on { background: var(--ok); }
 
   .grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+  .grid > * { min-width: 0; }            /* évite que la liste déborde de l'écran */
+  .two-col > * { min-width: 0; }
+  .clist li > div { min-width: 0; }
   @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
 
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
@@ -73,8 +76,8 @@
   .clist li:hover { background: var(--bg); }
   .clist li.active { background: var(--accent-soft); border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: -2px; }
   .avatar { width: 34px; height: 34px; border-radius: 8px; flex: none; display: grid; place-items: center; font-weight: 650; font-size: 13px; color: #fff; }
-  .cl-name { font-weight: 600; font-size: 14px; }
-  .cl-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cl-name { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+  .cl-sub { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
   .cl-meta { margin-left: auto; }
   .pill { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
   .pill.due { background: var(--danger-soft); color: var(--danger); }
@@ -111,16 +114,20 @@
   .sub-add { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: flex-start; }
   .sub-add input, .sub-add textarea { flex: 1; min-width: 120px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); }
   .sub-add input:focus, .sub-add textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .sub-add .narrow { flex: 0 0 130px; min-width: 0; }
-  .sub-add .date { flex: 0 0 150px; min-width: 0; }
-  .sub-add .time { flex: 0 0 105px; min-width: 0; }
+  .sub-add .narrow { flex: 1 1 130px; min-width: 110px; }
+  .sub-add .date { flex: 1 1 150px; min-width: 140px; }
+  .sub-add .time { flex: 0 1 115px; min-width: 100px; }
+  .sub-add .btn { flex: 0 0 auto; }
+  .sub-add input[type="text"] { flex: 3 1 190px; }          /* le libellé prime sur la date */
+  .sub-add textarea { flex: 1 1 100%; min-height: 64px; }   /* l'échange sur toute la largeur */
   .agenda-when .h { font-size: 11px; font-weight: 700; color: var(--accent); margin-top: 2px; }
 
   .line-list { list-style: none; margin: 0; padding: 0; }
-  .line-list li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--bg); }
-  .line-list .li-main { flex: 1; min-width: 0; }
-  .line-list .li-t { font-weight: 600; font-size: 14px; }
-  .line-list .li-s { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .line-list li { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px 10px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 7px; background: var(--bg); }
+  .line-list .li-main { flex: 1 1 165px; min-width: 0; }
+  .line-list .li-t { font-weight: 600; font-size: 14.5px; line-height: 1.4; overflow-wrap: anywhere; }
+  .line-list .li-s { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.45; overflow-wrap: anywhere; }
+  .line-list .li-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
   .line-list .li-note { font-size: 12.5px; color: var(--text); margin-top: 5px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; white-space: pre-wrap; }
   .line-list .li-amt { font-weight: 650; font-size: 14px; white-space: nowrap; text-align: right; }
   .line-list .li-amt .ht { display: block; font-size: 11.5px; color: var(--muted); font-weight: 500; }
@@ -130,7 +137,7 @@
   .x:hover { background: var(--danger-soft); color: var(--danger); }
   .chk { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; flex: none; margin-top: 2px; }
   .task-done .li-t { text-decoration: line-through; color: var(--muted); }
-  .date-badge { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 7px; white-space: nowrap; background: var(--bg); border: 1px solid var(--border); color: var(--muted); flex: none; }
+  .date-badge { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 7px; white-space: nowrap; background: var(--panel); border: 1px solid var(--border); color: var(--text); flex: none; align-self: center; }
   .date-badge.due { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
   .date-badge.soon { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 
@@ -144,8 +151,8 @@
 
   .exchange { display: flex; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
   .exchange:last-child { border-bottom: none; }
-  .exchange .ex-date { flex: 0 0 74px; font-size: 12px; color: var(--muted); font-weight: 600; padding-top: 1px; }
-  .exchange .ex-body { flex: 1; min-width: 0; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+  .exchange .ex-date { flex: 0 0 68px; font-size: 12px; color: var(--text); font-weight: 700; padding-top: 2px; }
+  .exchange .ex-body { flex: 1; min-width: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 
   .agenda-item { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 7px; cursor: pointer; transition: background .12s; }
   .agenda-item:hover { background: var(--bg); }
@@ -199,7 +206,7 @@
   .tarif-line .t-prix { font-weight: 700; color: var(--accent); }
   .num-cli { font-size: 12px; color: var(--muted); font-weight: 600; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 4px 0 18px; }
-  @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; gap: 6px; } }
+  @media (max-width: 1150px) { .two-col { grid-template-columns: 1fr; gap: 6px; } }
   .col-box { min-width: 0; }
   .col-box .sub-add { flex-wrap: wrap; }
   .scroll-box { max-height: 320px; overflow-y: auto; }
@@ -1583,6 +1590,14 @@ window.crmDevisPDF = genererDevisPDF;
   }
   function actKey(a){ return (a.date||"9999-99-99")+" "+(a.time||"99:99"); }
   function fmtWhen(date,time){ return fmtDate(date)+(time?" à "+time.replace(":","h"):""); }
+  // Version courte pour les listes : « 16 nov. · 13h30 »
+  function fmtWhenCourt(date,time){
+    if(!date) return "";
+    var d=new Date(date+"T00:00:00");
+    var txt=d.toLocaleDateString("fr-FR",{day:"numeric",month:"short"}).replace(".","");
+    if(d.getFullYear()!==new Date().getFullYear()) txt+=" "+d.getFullYear();
+    return txt+(time?" · "+time.replace(":","h"):"");
+  }
   function nextActionFor(c){ var open = (c.actions||[]).filter(function(a){ return !a.done && a.date; }); open.sort(function(a,b){ return actKey(a).localeCompare(actKey(b)); }); return open[0] || null; }
 
   // ---------- List ----------
@@ -1684,18 +1699,20 @@ window.crmDevisPDF = genererDevisPDF;
       return '<li data-fid="'+f.id+'">'+
         '<div class="li-main"><div class="li-t">'+esc(f.label||"Facture")+'</div>'+
         '<div class="li-s">'+esc(f.date?fmtDate(f.date):"Sans date")+'</div>'+ fileLink + note +'</div>'+
-        amt + '<div style="display:flex;flex-direction:column;gap:2px"><button class="x" data-edit-fac="'+f.id+'" title="Modifier">✏️</button>'+
-        '<button class="x" data-del-fac="'+f.id+'" title="Supprimer">✕</button></div></li>';
+        amt + '<span class="li-actions"><button class="x" data-edit-fac="'+f.id+'" title="Modifier">✏️</button>'+
+        '<button class="x" data-del-fac="'+f.id+'" title="Supprimer">✕</button></span></li>';
     }).join("") || '<div class="empty" style="padding:12px">Aucune facture.</div>';
 
     var actions = (d.actions||[]).slice().sort(function(a,b){ if(a.done!==b.done) return a.done?1:-1; return actKey(a).localeCompare(actKey(b)); });
     var actionsHTML = actions.map(function(a){
-      var badge = a.date ? '<span class="date-badge '+urgencyClass(a.date)+'">'+esc(fmtWhen(a.date,a.time))+'</span>' : '';
+      var badge = a.date ? '<span class="date-badge '+urgencyClass(a.date)+'" title="'+esc(fmtWhen(a.date,a.time))+'">'+esc(fmtWhenCourt(a.date,a.time))+'</span>' : '';
       return '<li class="'+(a.done?"task-done":"")+'" data-aid="'+a.id+'">'+
         '<input type="checkbox" class="chk" data-toggle="'+a.id+'" '+(a.done?"checked":"")+'>'+
         '<div class="li-main"><div class="li-t">'+esc(a.label)+'</div></div>'+ badge +
-        (a.date && !a.done ? '<a class="x agenda-link" href="'+urlAgenda(a,d)+'" target="_blank" rel="noopener" title="Ajouter à Google Agenda">📅</a>' : '')+
-        '<button class="x" data-del-act="'+a.id+'">✕</button></li>';
+        '<span class="li-actions">'+
+          (a.date && !a.done ? '<a class="x agenda-link" href="'+urlAgenda(a,d)+'" target="_blank" rel="noopener" title="Ajouter à Google Agenda">📅</a>' : '')+
+          '<button class="x" data-del-act="'+a.id+'" title="Supprimer">✕</button>'+
+        '</span></li>';
     }).join("") || '<div class="empty" style="padding:12px">Aucune action prévue.</div>';
 
     var reps = (d.repassages||[]).slice().sort(function(a,b){
@@ -1704,7 +1721,7 @@ window.crmDevisPDF = genererDevisPDF;
     });
     var repHTML = reps.map(function(r){
       var m=motif(r.motif)||{l:motifLabel(r.motif),bg:"#eef1f5",fg:"#5b6577"};
-      var badge = r.date ? '<span class="date-badge '+urgencyClass(r.date)+'">'+esc(fmtWhen(r.date,r.time))+'</span>'
+      var badge = r.date ? '<span class="date-badge '+urgencyClass(r.date)+'" title="'+esc(fmtWhen(r.date,r.time))+'">'+esc(fmtWhenCourt(r.date,r.time))+'</span>'
                          : '<span class="date-badge">sans date</span>';
       return '<li class="'+(r.done?"task-done":"")+'" data-rid="'+r.id+'">'+
         '<input type="checkbox" class="chk" data-reptoggle="'+r.id+'" '+(r.done?"checked":"")+'>'+
@@ -1712,7 +1729,7 @@ window.crmDevisPDF = genererDevisPDF;
           '<div class="li-t"><span class="motif-pill" style="background:'+m.bg+';color:'+m.fg+'">'+esc(m.l)+'</span></div>'+
           (r.note?'<div class="li-s">'+esc(r.note)+'</div>':'')+
         '</div>'+ badge +
-        '<button class="x" data-del-rep="'+r.id+'">✕</button></li>';
+        '<span class="li-actions"><button class="x" data-del-rep="'+r.id+'" title="Supprimer">✕</button></span></li>';
     }).join("") || '<div class="empty" style="padding:12px">Aucun repassage noté.</div>';
 
     var echanges = (d.echanges||[]).slice().sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
