@@ -289,6 +289,7 @@
     <div class="user-chip">
       <span class="dot" id="statusDot"></span>
       <span id="userEmail"></span>
+      <button id="btnSauv" title="Télécharger une sauvegarde de toutes les données">⬇ Sauvegarde</button>
       <button id="btnLogout">Déconnexion</button>
     </div>
   </header>
@@ -1303,6 +1304,32 @@ window.crmDevisPDF = genererDevisPDF;
   var pickedColor = "bleu";
   function membre(nom){ nom=(nom||"").trim().toLowerCase(); if(!nom) return null; for(var i=0;i<equipe.length;i++) if(equipe[i].nom.trim().toLowerCase()===nom) return equipe[i]; return null; }
   function couleurDe(nom){ var m=membre(nom); return m ? (PALETTE[m.couleur]||PALETTE.bleu) : null; }
+  // Sauvegarde complète : toutes les tables dans un fichier JSON
+  async function sauvegardeComplete(){
+    var tables=["clients","equipe"], dump={ application:"CRM – Exploitation Verdon", date:new Date().toISOString(), tables:{} };
+    for(var i=0;i<tables.length;i++){
+      var res = await sb.from(tables[i]).select("*");
+      if(res.error) throw new Error(tables[i]+" : "+res.error.message);
+      dump.tables[tables[i]] = res.data||[];
+    }
+    var resume = tables.map(function(t){ return t+" : "+dump.tables[t].length; }).join(" · ");
+    var blob = new Blob([JSON.stringify(dump,null,2)],{type:"application/json"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href=url; a.download="Sauvegarde_CRM_"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+    return resume;
+  }
+  function rappelSauvegarde(){
+    var d=null; try{ d=localStorage.getItem("crm_derniere_sauv"); }catch(e){}
+    var b=$("btnSauv"); if(!b) return;
+    if(!d){ b.title="Aucune sauvegarde téléchargée"; return; }
+    var jours = Math.round((Date.now()-new Date(d).getTime())/86400000);
+    b.title = "Dernière sauvegarde : "+new Date(d).toLocaleDateString("fr-FR")+" (il y a "+jours+" j)";
+    if(jours>=30){ b.style.color="var(--warn)"; b.style.borderColor="var(--warn)"; b.textContent="⬇ Sauvegarde ("+jours+" j)"; }
+  }
+
   async function loadEquipe(){
     try{
       var res = await sb.from("equipe").select("*").order("created_at",{ascending:true});
@@ -1538,7 +1565,7 @@ window.crmDevisPDF = genererDevisPDF;
     });
   }
   function showAuth(){ $("authScreen").classList.remove("hidden"); $("appScreen").classList.add("hidden"); }
-  async function showApp(){ $("authScreen").classList.add("hidden"); $("appScreen").classList.remove("hidden"); $("userEmail").textContent = currentUser.email||""; await loadEquipe(); await loadClients(); }
+  async function showApp(){ $("authScreen").classList.add("hidden"); $("appScreen").classList.remove("hidden"); $("userEmail").textContent = currentUser.email||""; rappelSauvegarde(); await loadEquipe(); await loadClients(); }
 
   // ---------- Data helpers ----------
   function getClient(id){ for(var i=0;i<clients.length;i++) if(clients[i].id===id) return clients[i]; return null; }
@@ -2669,6 +2696,18 @@ window.crmDevisPDF = genererDevisPDF;
   $("auth_pass").addEventListener("keydown", function(e){ if(e.key==="Enter") doAuth(); });
   $("authSwitch").addEventListener("click", switchAuthMode);
   $("btnLogout").addEventListener("click", async function(){ await sb.auth.signOut(); clients=[]; selectedId=null; });
+  $("btnSauv").addEventListener("click", async function(){
+    var b=$("btnSauv"), txt=b.textContent;
+    b.disabled=true; b.textContent="…";
+    try{
+      var r = await sauvegardeComplete();
+      try{ localStorage.setItem("crm_derniere_sauv", new Date().toISOString()); }catch(e){}
+      toast("Sauvegarde téléchargée ✓ ("+r+")");
+      b.textContent="⬇ Sauvegarde"; b.style.color=""; b.style.borderColor="";
+      rappelSauvegarde();
+    }catch(e){ console.error(e); toast("Erreur sauvegarde : "+e.message); b.textContent=txt; }
+    b.disabled=false;
+  });
 
   boot();
 })();
